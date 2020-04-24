@@ -1,0 +1,22 @@
+{
+  "name": "timeaxis",
+  "version": "0.0.1",
+  "description": "时间轴",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TaroRound/TimeAxis.git"
+  },
+  "keywords": [
+    "timeaxis"
+  ],
+  "author": "liu-yd",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/TaroRound/TimeAxis/issues"
+  },
+  "homepage": "https://github.com/TaroRound/TimeAxis#readme"
+}
