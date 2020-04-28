@@ -121,7 +121,7 @@ class MultiTimeAxis {
         var returnYear = function (t) { return formatDate(t, 'yyyy') };
         var returnWeek = function (t) { return getDate(t).getFullYear() + '第 ' + getWeek(t) + '周' }
         var timeFactory = scaleTime().domain([new Date(startDateInstance), new Date(endDateInstance)]);
-        // console.log('传入的时间值', returnDay(startDateInstance), returnDay(endDateInstance));
+
         // console.log('借助于d3.scaleTime', [...timeFactory.ticks(interval)].map( returnDay ) , [...timeFactory.ticks(timeDay.every(5))].map( returnDay ));
 
         var distance = endDateInstance - startDateInstance;
@@ -229,7 +229,6 @@ class MultiTimeAxis {
                 textStyle = this.tickStyle.normal,
                 scaleK;
             _registerBlocks.length = 0;
-
             if (this.direction === 'horizontal') {
                 scaleK = linear(
                             [this.min, this.max], 

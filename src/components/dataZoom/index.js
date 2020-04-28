@@ -1,4 +1,4 @@
-import {linear, pointToDom, formatDate, typeOf, merge_recursive, isInRange, calcBreakWord, getUUid, totalCountInAscArrByRange, getFirst, getExtremum, deepClone} from '../../lib/util/index';
+import {linear, pointToDom, formatDate, typeOf, merge_recursive, isInRange, calcBreakWord, getUUid, totalCountInAscArrByRange, getFirst, getExtremum, deepClone, getDate} from '../../lib/util/index';
 import {fillRect} from '../../shape/rect';
 import {fillLine, Line} from '../../shape/line';
 import fillText from '../../shape/text';
@@ -77,7 +77,7 @@ class dataZoom {
         }
 
         this.outer = merge_recursive({show: true, stroke: '#DDDDDD', background: 'rgba(0,0,0,0.0)' }, outer || {});
-        this.inner = merge_recursive({show: true, background: '#616870', stroke: null}, inner || {});
+        this.inner = merge_recursive({show: true, background: 'rgba(97,104,112,0.5)', stroke: null}, inner || {});
         this.resizerStyle = merge_recursive({ color: '#838E9C', width: 6, position: 'center' }, resizerStyle || {});
         this.boundaryText = merge_recursive({ show: true, textStyle: {fontSize: 12} }, boundaryText || {});
         
@@ -358,8 +358,10 @@ class dataZoom {
             data = fromCache ? this._dataViewData : [],
             first = getFirst(dataView),
             beginIndex = 0,
-            result;
+            result,
+            renderCurbe;
 
+        
         if (!dataViewSetting.show) {
             return
         }
@@ -368,48 +370,45 @@ class dataZoom {
             return
         }
 
+        var timeTpl = first,
+            toCale = direction === 'horizontal' ? width : height,
+            scalek = linear([0, toCale], [min, max]), 
+            curVal, maxVal;
         
+        // 根据第一个作为模板, 将 min/max(毫秒数) 转换为相对应的格式
+        // yyyy-MM-dd hh:mm:ss | yyyy:MM:dd hh:mm:ss | yyyy:MM:dd ...等
+        // timeTpl = timeTpl.match(/[:\s-/|]/g);
+        var matter = {0:'yyyy', 1: 'MM', 2: 'dd', 3: 'hh', 4: 'mm', 5: 'ss'};
+        var i = 0;
+        timeTpl = timeTpl.replace(/\d+/g, function (match, $1, index, str) {
+            var tr = matter[i];
+            i++;
+            return match.length > 2 ? 'yyyy' : tr;
+        });
+
         // 如果传递给视图的不为数值: 不符合统计的规律
         // 为日期格式开个特例:
         if (!fromCache) {
             if (typeof first === 'string') {
-                var time_s1 = Date.now();
+
                 // 几十万的大数组排序操作, 这会是性能耗费大户, 但为了后续取值的方便, 这一步是应该做的;
                 dataView.sort((n1, n2) => { return n1 > n2 ? -1 : 1 });
 
-                var timeTpl = first,
-                    scalek, curVal, maxVal;
-                
-                // 根据第一个作为模板, 将 min/max(毫秒数) 转换为相对应的格式
-                // yyyy-MM-dd hh:mm:ss | yyyy:MM:dd hh:mm:ss | yyyy:MM:dd ...等
-                // timeTpl = timeTpl.match(/[:\s-/|]/g);
-                var matter = {0:'yyyy', 1: 'MM', 2: 'dd', 3: 'hh', 4: 'mm', 5: 'ss'};
-                var i = 0;
-                timeTpl = timeTpl.replace(/\d+/g, function (match, $1, index, str) {
-                    var tr = matter[i];
-                    i++;
-                    return match.length > 2 ? 'yyyy' : tr;
-                });
+                if (dataView.length < toCale) {
+                    for (var i = 0, dataLen = dataView.length, date; i < dataLen; i++) {
+                        curVal = dataView[i];
+                        maxVal = dataView[i+1 >= dataLen ? dataLen - 1 : i + 1];
 
-                
-                if (direction === 'horizontal') {
-                    scalek = linear([0, width], [min, max]);
-                    
-                    // 数据采样率取视图的宽度: 无论数据视图提供的数据特别多还是很少, 按一像素来 "采样"计数值是较为准确的;
-                    // 如果当数据视图数据量少时依照数据量来计算, 那么计算出来的点与点之间必然会存在间隙; 那么当链接两个点的时候, 无疑是为这些"间隙点" 创建了值; 因此并不可取; 
-                    for (var i = 0; i < width; i++) {
-                        curVal = formatDate(scalek.setX(i), timeTpl);
-                        maxVal = formatDate(scalek.setX(i + 1), timeTpl);
-
-                        result = totalCountInAscArrByRange(dataView, [curVal, maxVal], beginIndex);
-                        beginIndex = result.index[1];
-                        data.push(result.value);
-                        result = null;
+                        if (date = getDate(curVal)) {
+                            data.push({
+                                x: date,
+                                value: 1
+                            });
+                        }
+                        renderCurbe = true;
                     }
                 } else {
-                    scalek = linear([0, height], [min, max]);
-                    // 数据采样率取视图的高度:
-                    for (var i = 0; i < height; i++) {
+                    for (var i = 0; i < toCale; i++) {
                         curVal = formatDate(scalek.setX(i), timeTpl);
                         maxVal = formatDate(scalek.setX(i + 1), timeTpl);
 
@@ -419,29 +418,29 @@ class dataZoom {
                         result = null;
                     }
                 }
+
             } else {
 
-                dataView.sort((n1, n2) => { return n1 > n2 ? 1 : -1 });
-                var scalek, curVal, maxVal;
-                
-                if (direction === 'horizontal') {
-                    scalek = linear([0, width], [min, max]);
-                    // 数据采样率取视图的宽度:
-                    for (var i = 0; i < width; i++) {
-                        curVal = scalek.setX(i);
-                        maxVal = scalek.setX(i + 1);
+                // 几十万的大数组排序操作, 这会是性能耗费大户, 但为了后续取值的方便, 这一步是应该做的;
+                dataView.sort((n1, n2) => { return n1 > n2 ? -1 : 1 });
 
-                        result = totalCountInAscArrByRange(dataView, [curVal, maxVal], beginIndex);
-                        beginIndex = result.index[1];
-                        data.push(result.value);
-                        result = null;
+                if (dataView.length < toCale) {
+                    for (var i = 0, dataLen = dataView.length, date; i < dataLen; i++) {
+                        curVal = dataView[i];
+                        maxVal = dataView[i+1 >= dataLen ? dataLen - 1 : i + 1];
+
+                        if (date = getDate(curVal)) {
+                            data.push({
+                                x: date,
+                                value: 1
+                            });
+                        }
+                        renderCurbe = true;
                     }
                 } else {
-                    scalek = linear([0, height], [min, max]);
-                    // 数据采样率取视图的高度:
-                    for (var i = 0; i < height; i++) {
-                        curVal = scalek.setX(i);
-                        maxVal = scalek.setX(i + 1);
+                    for (var i = 0; i < toCale; i++) {
+                        curVal = formatDate(scalek.setX(i), timeTpl);
+                        maxVal = formatDate(scalek.setX(i + 1), timeTpl);
 
                         result = totalCountInAscArrByRange(dataView, [curVal, maxVal], beginIndex);
                         beginIndex = result.index[1];
@@ -453,6 +452,7 @@ class dataZoom {
             
             this._dataViewData = data;
         }
+
         // 测试数据准确度;
         // var totel = data.reduce((preReturn, next) => preReturn + next, 0);
         if (data.length) {
@@ -462,21 +462,40 @@ class dataZoom {
                 _max = extremum.max,
                 scalek,
                 dataLen = data.length;
+
             if (direction === 'horizontal') {
-                scalek = linear([_min, _max], [height*0.9, 0]); // *0.9
+                scalek = linear([_min, _max], [height, 0]); // *0.9
                 lineArea = new Line({x: x, y: y + height}, null, dataViewSetting.stroke, dataViewSetting.fill); // , {x: x, y: y + height}
-                // 依据宽度/高度, 连续取样;
-                for (var i = 0; i < dataLen; i++) {
-                    lineArea.addPoint(x + i, y + scalek.setX(data[i]));
+
+                if (renderCurbe) {
+                    for (var i = 0; i < dataLen; i++) {
+                        lineArea.addPoint(data[i].x, y + scalek.setX(data[i].value));
+                    }
+                } else {
+                    for (var i = 0; i < toCale; i++) {
+                        lineArea.addPoint(x + i, y + scalek.setX(data[i]));
+                    }
                 }
-                lineArea.addPoint(x + width, y + height);
             } else {
-                scalek = linear([_min, _max], [width*0.9, 0]); // *0.9
+                scalek = linear([_min, _max], [width, 0]); // *0.9
                 lineArea = new Line({x: x + width, y: y}, null, dataViewSetting.stroke, dataViewSetting.fill); // , {x: x + width, y: y}
-                for (var i = 0; i < dataLen; i++) {
-                    lineArea.addPoint(x + scalek.setX(data[i]), y + i);
+
+                if (renderCurbe) {
+                    for (var i = 0; i < dataLen; i++) {
+                        lineArea.addPoint(x + scalek.setX(data[i].value), y + data[i].x);
+                    }
+                } else {
+                    for (var i = 0; i < toCale; i++) {
+                        lineArea.addPoint(x + scalek.setX(data[i]), y + i);
+                    }
                 }
-                lineArea.addPoint(x + width, y + height);
+            }
+
+            // 依据宽度/高度, 连续取样;
+            lineArea.addPoint(x + width, y + height);
+
+            if (renderCurbe) {
+                lineArea.createCurvePath(this.canvas2dContext);
             }
             if (lineArea) {
                 lineArea.fill(this.canvas2dContext);
@@ -789,7 +808,6 @@ class dataZoom {
             if (this.direction === 'horizontal') {
 
                 startRange = [sliderShape.x - this.resizerStyle.width / 2, sliderShape.x + (this.resizerStyle.width / 2)];
-                // console.log('是否在范围内', this.lastSize.x, sliderShape.x, this.resizerStyle.width, startRange, isInRange(this.lastSize.x, startRange));
                 if (isInRange(this.lastSize.x, startRange)) {
                     newStartPos = this.lastSize.x + dragVector.x;
                     newEndPos = sliderShape.x + sliderShape.width;
@@ -853,7 +871,7 @@ class dataZoom {
 
             this.lastSize.x = location.x;
             this.lastSize.y = location.y;
-            this.canvas2dContext.clearRect(this.x, this.y, this.width, this.height);
+            this.erase();
             this.drawSliders(true);
 
             // 取消触发 moving 事件, 滑块重置大小过程中如果重筛选数据, 在大量数据时会造成明显卡顿: 这是一个待优化的地方, 目前暂没想到好办法
@@ -879,8 +897,7 @@ class dataZoom {
             
             this.lastdrag.x = location.x;
             this.lastdrag.y = location.y;
-            this.canvas2dContext.clearRect(this.x, this.y, this.width, this.height);
-
+            this.erase();
             this.drawSliders(true);
             this.emit('datazoom-moving' + this.uid);
         }
@@ -907,7 +924,7 @@ class dataZoom {
 
             this.updateValueRange(this.shapes.inner, location.x - this.shapes.inner.x - this.shapes.inner.width/2, location.y - this.shapes.inner.y);
 
-            this.canvas2dContext.clearRect(this.x, this.y, this.width, this.height);
+            this.erase();
             this.drawSliders(true);
             this.emit('datazoom-select' + this.uid);
             

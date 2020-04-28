@@ -1207,9 +1207,9 @@ function scaleTime () {
 				onequant;
 			interval = interval || 5;
 			onequant = 1 / interval;
-			scaleK = linear([0, interval-1], [startTime.getTime(), endTime.getTime()]);
 
 			if (!isUnAvai) {
+                scaleK = linear([0, interval-1], [startTime.getTime(), endTime.getTime()]);
 				for(var i = 0; i < interval; i++) {
 					res.push(new Date( parseInt(scaleK.setX(i)) ))
 				}

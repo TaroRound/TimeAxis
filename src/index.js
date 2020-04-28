@@ -187,7 +187,7 @@ class TimeStaticChart extends Chart {
         tickRenderStart, // 设置一个默认的左间距
         fieldkey_timestamp,
         fieldkey_nodeId,
-        fieldKey_nodeText,
+        fieldkey_nodeText,
         fieldkey_from,
         fieldkey_to,
         fieldkey_links,
@@ -199,7 +199,6 @@ class TimeStaticChart extends Chart {
 
         this.status = 0;
         this.direction = direction || 'horizontal';  // horizontal|vertical
-        this.tooltip = tooltip || null;
         this.dataZoom = Object.assign({show: true}, dataZoom||{} );
         this.axis = Object.assign({ show: true, insertIndex: 0 }, axis || {});
         this.axisClone = Object.assign({}, this.axis);
@@ -215,14 +214,14 @@ class TimeStaticChart extends Chart {
         this.eventHandler = null;
         this.tickRenderStart = direction === 'horizontal' ? tickRenderStart || 160 : 60;
         //
-        this.fieldkey_timestamp = fieldkey_timestamp;
-        this.fieldkey_nodeId = fieldkey_nodeId;
-        this.fieldKey_nodeText = fieldKey_nodeText;
-        this.fieldkey_from = fieldkey_from;
-        this.fieldkey_to = fieldkey_to;
-        this.fieldkey_links = fieldkey_links;
-        this.fieldkey_nodes = fieldkey_nodes;
-        this.fieldkey_groupId = fieldkey_groupId;
+        this.fieldkey_timestamp = fieldkey_timestamp || 'timestamp';
+        this.fieldkey_nodeId = fieldkey_nodeId || 'nodeId';
+        this.fieldkey_nodeText = fieldkey_nodeText || 'text';
+        this.fieldkey_from = fieldkey_from || 'from';
+        this.fieldkey_to = fieldkey_to || 'to';
+        this.fieldkey_links = fieldkey_links || 'links';
+        this.fieldkey_nodes = fieldkey_nodes || 'nodes';
+        this.fieldkey_groupId = fieldkey_groupId || 'groupId';
         this.safePerformance = safePerformance;
         
         // 网格边距
@@ -318,25 +317,36 @@ class TimeStaticChart extends Chart {
         // 初始化布局
         this.initLayout(this.series).then(resolve => {
             this.performance.t8 = Date.now() + ':计算布局, 标记时间点:';
-
+            
             this.animation.renderDataZoom = requestAnimationFrame(()=>{
                     // 绘制缩放控件
-                    this.drawDataZoom();
+                    try {
+                        this.drawDataZoom();
+                    } catch (e) {
+                        console.log('初始化阶段, 绘制缩放控件出错', e);
+                    }
                 }, 16);
 
             this.animation.renderTimeTick = requestAnimationFrame(()=>{
                     // 绘制刻度尺控件
-                    this.drawTimeTicks();
+                    try {
+                        this.drawTimeTicks();
+                    } catch (e) {
+                        console.log('初始化阶段, 绘制刻度尺', e);
+                    }
                 }, 16);
 
             this.performance.t9 = Date.now() + ':计算布局 所耗时间:' + (parseFloat(this.performance.t8) - parseFloat(this.performance.t7));
             
             // 依据计算好的布局信息, 在对应的区块内绘制图/轴
-            this.drawCharts();
+            try {
+                this.drawCharts();
+            } catch (e) {
+                console.log('初始化阶段, 绘制图表出错', e);
+            }
+            
             this.performance.t10 = Date.now() + ':绘制图例, 标记时间点:';
             this.performance.t11 = Date.now() + ':总耗时:' + (parseFloat(this.performance.t10) - parseFloat(this.performance.t1)) + ', 开始异步绘制';
-
-            // console.log('记录性能', this.performance);
         }, reject => {
             console.log('O.O, 意外错误');
         });
@@ -607,53 +617,53 @@ class TimeStaticChart extends Chart {
 
     // 刻度尺的位置和滑动条的位置邻近: 
     drawTimeTicks (config) {
-        var boundary = this.layout.filter(v => {
+        var TimeAxisAndZoomLayout = this.layout.filter(v => {
             return v.type === 'axis';
         })[0];
 
-        if (boundary) {
+        if (TimeAxisAndZoomLayout) {
             var {position, min, max, timeunit, startValue, endValue} = Object.assign({}, this.dataZoom, config);
             var sliderHeight = this.dataZoom.height || 20;
-            var margin = this.dataZoom.margin;
+            var margin = this.dataZoom.margin || 0;
             var boxModer = { x: 0, y: 0, width: 0, height: 0 };
 
             // 横向
             if (this.direction === 'horizontal') {
                 switch (position) {
                     case 'top':
-                        boxModer.y = boundary.y + sliderHeight + margin;
+                        boxModer.y = TimeAxisAndZoomLayout.y + sliderHeight + margin;
                         break;
                     // case 'middle':
-                        // boxModer.y = boundary.y + boundary.height - 10;
+                        // boxModer.y = TimeAxisAndZoomLayout.y + TimeAxisAndZoomLayout.height - 10;
                         break;
                     case 'bottom':
-                        boxModer.y = boundary.y;
+                        boxModer.y = TimeAxisAndZoomLayout.y;
                         break;
                     default:
-                        boxModer.y = boundary.y;
+                        boxModer.y = TimeAxisAndZoomLayout.y;
                         break;
                 }
-                boxModer.x = boundary.x;
-                boxModer.width = boundary.width;
-                boxModer.height = boundary.height - sliderHeight - margin;
+                boxModer.x = TimeAxisAndZoomLayout.x;
+                boxModer.width = TimeAxisAndZoomLayout.width;
+                boxModer.height = TimeAxisAndZoomLayout.height - sliderHeight - margin;
             } else {
                 switch (position) {
                     case 'left':
-                        boxModer.x = boundary.x + sliderHeight + margin;
+                        boxModer.x = TimeAxisAndZoomLayout.x + sliderHeight + margin;
                         break;
                     // case 'center':
-                    //     boxModer.x = boundary.x + (boundary.width - sliderHeight)/2;
+                    //     boxModer.x = TimeAxisAndZoomLayout.x + (TimeAxisAndZoomLayout.width - sliderHeight)/2;
                     //     break;
                     case 'right':
-                        boxModer.x = boundary.x;
+                        boxModer.x = TimeAxisAndZoomLayout.x;
                         break;
                     default: 
-                        boxModer.x = boundary.x;
+                        boxModer.x = TimeAxisAndZoomLayout.x;
                         break;
                 }
-                boxModer.y = boundary.y;
-                boxModer.width = boundary.width - sliderHeight - margin;
-                boxModer.height = boundary.height;
+                boxModer.y = TimeAxisAndZoomLayout.y;
+                boxModer.width = TimeAxisAndZoomLayout.width - sliderHeight - margin;
+                boxModer.height = TimeAxisAndZoomLayout.height;
             }
 
             var {boundary, offset, tickRenderStart, titleHeight} = this.getDefaultMargin();     
@@ -696,7 +706,7 @@ class TimeStaticChart extends Chart {
 
     drawCharts () {
         var {startValue, endValue, min, max} = this.dataZoom;
-        var {fieldkey_links, fieldkey_nodes, fieldkey_from, fieldkey_to, fieldkey_nodeId, fieldkey_timestamp, fieldKey_nodeText} = this;
+        var {fieldkey_links, fieldkey_nodes, fieldkey_from, fieldkey_to, fieldkey_nodeId, fieldkey_timestamp, fieldkey_nodeText} = this;
         // 'to right: 0 rgba(0,0,0,0.5): 0.5 #ccc: 1 #f0f0f0' || 
         this.chartInstance = [];
         this.layout.forEach((layout,i) => {
@@ -710,8 +720,8 @@ class TimeStaticChart extends Chart {
                     var color = defaultColor;
                     var splitLineStyle = this.splitLine;
                     var nodeSlider = this.nodeSlider;
-                    var nodeTextStyle = {padding: this.nodePadding};
-                    var {offset, padding, boundary, titleHeight, tickRenderStart, minCellWidth} = this.getDefaultMargin();
+                    var {offset, padding, boundary, titleHeight, tickRenderStart, minCellWidth, nodePadding} = this.getDefaultMargin();
+                    var nodeTextStyle = nodePadding ? {padding: nodePadding} : null;
                     var chartBackground,
                         fieldKey_nodeSourcetype,
                         first, 
@@ -758,14 +768,13 @@ class TimeStaticChart extends Chart {
                         fieldkey_to,
                         fieldkey_nodeId,
                         fieldkey_timestamp,
-                        fieldKey_nodeText,
+                        fieldkey_nodeText,
                         fieldkey_sourcetype: fieldKey_nodeSourcetype,
                         timestampIsString: this.dataZoom.timestampIsString,
                         tooltip: this.tooltip,
                         nodeSlider: nodeSlider,
                         itemStyle: itemStyle
                     });
-
                     var newTimeLines = new TimeSeriesLine(this.context, setting, series, this.eventHandler, this.canvas);
 
                     var fireEvents = ['legendChange', 'itemClick', 'itemHover', 'nodeClick', 'nodeContextMenu', 'nodeDrag'];
@@ -877,7 +886,7 @@ class TimeStaticChart extends Chart {
             _max = _min + end * k; // min + 100k = max; => min + end*k = max;
         }
         k = (_max - _min) / 100;
-        
+
         if (totalMaxCount > safeMaxCount) {
             var _ev = safeMaxCount / totalMaxCount * 100;
 
@@ -1202,7 +1211,7 @@ class TimeStaticChart extends Chart {
     update (series, setOptions) {
         // 数据更新, 重设置所有组件
         if (series) {
-            var safeChangeAttrs = 'width,height,safePerformance,direction,tooltip,axis,grid,dragPercent,tickRenderStart,fieldkey_timestamp,fieldkey_nodeId,fieldKey_nodeText,fieldkey_from,fieldkey_to,fieldkey_links,fieldkey_nodes,chartPadding,chartMargin,nodePadding,chartOffset,minCellWidth';
+            var safeChangeAttrs = 'width,height,safePerformance,direction,tooltip,axis,grid,dragPercent,tickRenderStart,fieldkey_timestamp,fieldkey_nodeId,fieldkey_nodeText,fieldkey_from,fieldkey_to,fieldkey_links,fieldkey_nodes,chartPadding,chartMargin,nodePadding,chartOffset,minCellWidth';
             // 对配置项进行合并
             this.mergeOptions(setOptions, safeChangeAttrs);
             this.series = series || [];
@@ -1253,7 +1262,7 @@ class TimeStaticChart extends Chart {
                 console.log('O.O, 意外错误');
             });
         } else {
-            var safeChangeAttrs = 'direction,width,axis,height,tooltip,dragPercent,tickRenderStart,fieldkey_timestamp,fieldkey_nodeId,fieldKey_nodeText,fieldkey_from,fieldkey_to,fieldkey_links,fieldkey_nodes,chartPadding,chartOffset,chartMargin,nodePadding,minCellWidth';
+            var safeChangeAttrs = 'direction,width,axis,height,tooltip,dragPercent,tickRenderStart,fieldkey_timestamp,fieldkey_nodeId,fieldkey_nodeText,fieldkey_from,fieldkey_to,fieldkey_links,fieldkey_nodes,chartPadding,chartOffset,chartMargin,nodePadding,minCellWidth';
             this.mergeOptions(setOptions, safeChangeAttrs);
             this.erase();
             this.setAxisHeight(true);

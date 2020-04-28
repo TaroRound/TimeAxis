@@ -1,12 +1,16 @@
 const path = require('path');
+const webpack = require('webpack');
 
 module.exports = {
 	//mode: "production",
 	mode: "development",
 	entry: './src/index',
+	
 	output: {
 		path: path.resolve(__dirname, 'dist'),
-		filename: 'index.js'
+		filename: 'index.js',
+		library: 'TimeAxis',
+		libraryTarget: 'umd',
 	},
 	module: {
 		rules: [

@@ -90,29 +90,38 @@ class Chart {
         if (this.tooltip.show) {
             
             let tooltip = document.createElement('div');
+            let tooltipDefultStyle = {
+                'display': 'none',
+                '-webkit-user-select': 'none',
+                'user-select': 'none',
+                '-webkit-touch-callout': 'none',
+                '-webkit-tap-highlight-color': 'rgba(0,0,0,0)',
+                'border-width': '0',
+                'margin': '0',
+                'padding': '5px',
+                'background': 'rgba(0,0,0,0.5)',
+                'position': 'absolute',
+                'transform': 'translate(0px, 0px)',
+                'fontSize': '12px',
+                'lineHeight': '1.6',
+                'color': '#fff',
+                'textAlign': 'left',
+                'wordBreak': 'break-all',
+                'borderRadius': '3px',
+                'boxShadow': 'rgba(0, 0, 0, 0.2) 0px 1px 4px',
+                // 'transition': 'transform 0.3s cubic-bezier(0.68, 0, 0, 0.97) 0s',
+            }
             tooltip.className = "tooltip-box";
 
             if (tooltip.style) {
                 var domStyle = tooltip.style;
-                domStyle.position = "absolute";
-                domStyle.transform = 'translate(0px, 0px)';
-                // tooltip.setAttribute('transform', 'translate(0px, 0px)');
-                // domStyle.transition = 'transform 0.3s cubic-bezier(0.68, 0, 0, 0.97) 0s';
-                domStyle.display = 'none';
-                domStyle['-webkit-user-select'] = 'none';
-                domStyle['user-select'] = 'none';
-                domStyle['-webkit-touch-callout'] = 'none';
-                domStyle['-webkit-tap-highlight-color'] = 'rgba(0,0,0,0)';
-                domStyle['margin'] = 0;
-                domStyle['border-width'] = 0;
+                // domStyle.cssText = 'position;absolute'
+                for (var key in tooltipDefultStyle) {
+                    domStyle[key] = tooltipDefultStyle[key]
+                };
 
-                domStyle.background = 'rgb(255, 255, 255)';
-                domStyle.padding = '5px';
-                domStyle.fontSize = '12px';
-                domStyle.boxShadow = 'rgba(0, 0, 0, 0.2) 0px 1px 4px';
-                domStyle.wordBreak = 'break-all';
                 // 先设定默认的样式, 如果有自定义的样式, 那么再去设置
-                var safeAttr = ['padding', 'background', 'fontSize', 'lineHeight', 'boxShadow', 'color', 'borderRadius'];
+                var safeAttr = ['padding', 'background', 'fontSize', 'lineHeight', 'boxShadow', 'color', 'borderRadius', 'textAlign'];
                 if (this.tooltip.style) {
                     safeAttr.forEach(key => {
                         if (this.tooltip.style[key] !== undefined) {

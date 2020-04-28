@@ -196,6 +196,7 @@ Line.prototype.fill = function (context) {
 
 // 创建一个贝塞尔平滑曲线路径
 Line.prototype.createCurvePath = function (context, smooth) {
+    var points = this.points;
     context.beginPath();
     context.moveTo(points[0].x, points[0].y);
     var points = this.points;

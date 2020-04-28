@@ -135,7 +135,7 @@ class TimeSeriesLine {
         fieldkey_from,
         fieldkey_to,
         fieldkey_nodeId,
-        fieldKey_nodeText,
+        fieldkey_nodeText,
         fieldkey_timestamp,
         fieldkey_sourcetype,
         timestampIsString,
@@ -196,19 +196,20 @@ class TimeSeriesLine {
                 position: 'center'
             }
         }, nodeSlider || {show: !!minCellWidth });
+
         this.minCellWidth = nodeSlider && nodeSlider.show ? minCellWidth || 1 : minCellWidth || 0;
         this.titleHeight = titleHeight || 0; // 40;
         this.timeunit = timeunit || 'year';
         this.timeReader = timeReader;
         this.timestampIsString = timestampIsString;
-        this.fieldkey_links = fieldkey_links;
-        this.fieldkey_nodes = fieldkey_nodes;
-        this.fieldkey_nodeId = fieldkey_nodeId;
-        this.fieldkey_from = fieldkey_from;
-        this.fieldkey_to = fieldkey_to;
-        this.fieldkey_timestamp = fieldkey_timestamp; // timestamp
-        this.fieldKey_nodeText = fieldKey_nodeText;
-        this.fieldkey_sourcetype = fieldkey_sourcetype;
+        this.fieldkey_links = fieldkey_links || 'links';
+        this.fieldkey_nodes = fieldkey_nodes || 'nodes';
+        this.fieldkey_nodeId = fieldkey_nodeId || 'nodeId';
+        this.fieldkey_from = fieldkey_from || 'from';
+        this.fieldkey_to = fieldkey_to || 'to';
+        this.fieldkey_timestamp = fieldkey_timestamp || 'timestamp';
+        this.fieldkey_nodeText = fieldkey_nodeText || 'text';
+        this.fieldkey_sourcetype = fieldkey_sourcetype || 'sourceType';
         this.tooltip = tooltip || {show: true};
         this.saferange = saferange || this.endPercent - this.startPercent;
         
@@ -285,6 +286,7 @@ class TimeSeriesLine {
             color: '#fff',
             activeColor: 'red'
         }
+        this.timestampInstance = null;
         this.startTime = null;
         this.endTime = null;
         this.layers = [];   // 图层信息
@@ -344,6 +346,12 @@ class TimeSeriesLine {
         var { background, offset, direction } = this;
         var {x, y, width, height} = this.layout.grid;
 
+        if (isBlokHidden({x, y, width, height})) {
+            x = this.x;
+            y = this.y;
+            width = this.width;
+            height = this.height;
+        }
         this.erase({
             x, y, width, height
         });
@@ -391,8 +399,12 @@ class TimeSeriesLine {
             
             // 根据设置的百分比, 设定值的区间
             this.initTimeRange();
+            this.calcDataFormatter();
             // 根据设定的值的区间, 筛选出值区间内的节点, 线条; 并且建立起值区间内值的缓存
             this.createRenderNodesAndLinks();
+
+            // 根据传入的图层数据, 组合头部信息
+            this.createTitle();
 
             this.initLayout()
             var {title, node, grid, nodeSlider, indicator} = this.layout;
@@ -411,13 +423,10 @@ class TimeSeriesLine {
             this.createNodeSliders();
             // 再依据上一步过滤后的值, 计算出所有文本的最大宽度: 这个步骤在当前功能下不推荐操作, 它会破坏整体图形的样式统一性; 因此传入了统一的固定值(不计算)
             this.calcMaxTextWidthOrHeight();
-            // 根据传入的图层数据, 组合头部信息
-            this.createTitle();
             
             this.createScaleNodes();
             this.createScaleTimes();
             this.renderFullChartBackground();
-
 
             // 头部: 节点操作, 标题, 筛选等相关功能
             if (!isBlokHidden(title)) {
@@ -511,9 +520,12 @@ class TimeSeriesLine {
                 // this.erase();
                 // 根据设置的百分比, 设定值的区间
                 this.initTimeRange();
+                this.calcDataFormatter();
                 // 根据设定的值的区间, 筛选出值区间内的节点, 线条; 并且建立起值区间内值的缓存
                 this.createRenderNodesAndLinks();
                 
+                // 根据传入的图层数据, 组合头部信息
+                this.createTitle();
                 this.initLayout();
 
                 var {title, node, grid, nodeSlider, indicator} = this.layout;
@@ -531,8 +543,7 @@ class TimeSeriesLine {
                 this.createNodeSliders();
                 // 再依据上一步过滤后的值, 计算出所有文本的最大宽度: 这个步骤在当前功能下不推荐操作, 它会破坏整体图形的样式统一性; 因此传入了统一的固定值(不计算)
                 this.calcMaxTextWidthOrHeight();
-                // 根据传入的图层数据, 组合头部信息
-                this.createTitle();
+                
                 
                 this.createScaleNodes();
                 this.createScaleTimes();
@@ -566,7 +577,6 @@ class TimeSeriesLine {
             }
             // 否则只是针对一些配置项进行更新;
             else {
-
                 // 重设置;
                 // this.erase({});
                 // 根据设置的百分比, 设定值的区间
@@ -578,6 +588,8 @@ class TimeSeriesLine {
                 // this.performance['缓存的建立'] = this.performance['缓存的建立'] ? this.performance['缓存的建立'] + (time_start2 - t1) : (time_start2 - t1);
                 // this.performance['缓存的建立-当前帧'] = (time_start2 - t1);
 
+                // 根据传入的图层数据, 组合头部信息
+                this.createTitle();
                 // 初始化各小模块的布局:
                 this.initLayout();
 
@@ -608,8 +620,7 @@ class TimeSeriesLine {
                 this.createNodeSliders();
                 // 再依据上一步过滤后的值, 计算出所有文本的最大宽度: 这个步骤在当前功能下不推荐操作, 它会破坏整体图形的样式统一性; 因此传入了统一的固定值(不计算)
                 // this.calcMaxTextWidthOrHeight();
-                // 根据传入的图层数据, 组合头部信息
-                this.createTitle();
+                
                 
                 this.createScaleNodes();
                 this.createScaleTimes();
@@ -627,8 +638,7 @@ class TimeSeriesLine {
                             this.removeRegisterBlock();
                             this.renderTitle();
                             this.addRegisterBlock();
-                            // time_s5 = Date.now();
-                            // console.log('绘制头部', time_s5 - time_s4);
+
                             // this.performance['绘制标题栏'] = this.performance['绘制标题栏'] ? this.performance['绘制标题栏'] + (time_s5 - time_s4) : (time_s5 - time_s4);
                             // this.performance['绘制标题栏-当前帧'] = (time_s5 - time_s4);
                         }, 50);
@@ -655,7 +665,6 @@ class TimeSeriesLine {
                 // this.performance['绘制节点-当前帧'] = (time_s6 - time_s7);
                 // this.performance['当前帧绘制计时'] = time_s6 - time_start;
                 // this.performance['帧数绘制总计时'] = this.performance['帧数绘制总计时'] ? this.performance['帧数绘制总计时'] + (time_s6 - time_start) : (time_s6 - time_start);
-                // console.log('输出性能记录', this.performance);
             }
         // }, 16); // 16
     }
@@ -895,6 +904,44 @@ class TimeSeriesLine {
         // });
     }
 
+    calcDataFormatter () {
+        var {fieldkey_links, fieldkey_timestamp} = this;
+        var opt, instance;
+        if (this.optionsList) {
+            for (var i=0, len=this.optionsList.length; i<len; i++) {
+                opt = this.optionsList[i];
+                fieldkey_links = opt.fieldkey_links || fieldkey_links;
+                fieldkey_timestamp = opt.fieldkey_timestamp || fieldkey_timestamp;
+                if (opt.data && opt.data[fieldkey_links]) {
+
+                    for (var k = 0,dataLen = opt.data[fieldkey_links].length; k < dataLen; k++) {
+
+                        if (opt.data[fieldkey_links][k][fieldkey_timestamp]) {
+                            instance = opt.data[fieldkey_links][k][fieldkey_timestamp];
+                            break;
+                        }
+                    }
+                }
+                if (instance) {
+                    break;
+                }
+            }
+
+            // 如果传入的这个值是 2019, 2019-08, 2019-08-02, 1300131300, 130013001300, 2019-08-02 12:00:00 等等众多种情况;
+            // 带 -/ 时, 可以认为它是时间格式的一种, 需要处理一下这种情况便于 筛选值;
+            if (instance && /[/:-].test(instance)/) {
+                var matter = {0:'yyyy', 1: 'MM', 2: 'dd', 3: 'hh', 4: 'mm', 5: 'ss'};
+                var i = 0;
+                instance = instance.replace(/\d+/g, function (match, $1, index, str) {
+                    var tr = matter[i];
+                    i++;
+                    return match.length > 2 ? 'yyyy' : tr;
+                });
+            }
+        }
+        this.timestampInstance = instance
+    }
+
     createGrid () {
         var x, y, width, height;
         if (this.direction === 'horizontal') {
@@ -938,10 +985,9 @@ class TimeSeriesLine {
             combine = null,
             combineLayer = null,
             isShow = this.optionsList.some(option => option.title && (option.title.show == undefined || option.title.show));
-        
+
         try {
             this.optionsList.forEach((option,index) => {
-
                 var title = option.title || {};
                 if (title.titleText) { //  && title.titleText.show
                     
@@ -1060,15 +1106,14 @@ class TimeSeriesLine {
     createRenderNodesAndLinks (fromCache) {        
         // 筛选条件
         var {startTime, endTime} = this;
-        var startTimeDateString = this.timestampIsString ? formatDate(startTime, 'yyyy-MM-dd hh:mm:ss') : startTime;
-        var endTimeDateString = this.timestampIsString ? formatDate(endTime, 'yyyy-MM-dd hh:mm:ss') : endTime;
-        
+        var startTimeDateString = this.timestampIsString ? formatDate(startTime, this.timestampInstance || 'yyyy-MM-dd hh:mm:ss') : startTime;
+        var endTimeDateString = this.timestampIsString ? formatDate(endTime, this.timestampInstance || 'yyyy-MM-dd hh:mm:ss') : endTime;
+
         // 待绘制的节点, 线条数据, 以及节点对应索引位置的必要缓存信息
         var links = [];
         var renderNodes = [];
         var nodeIndexCache = {};
 
-        var t1 = Date.now();
         // 从缓存中筛选出需要的数据:
         if (fromCache) {
             var cache = {};
@@ -1099,7 +1144,7 @@ class TimeSeriesLine {
                 }
             }
         } else {
-            var {fieldkey_links, fieldkey_nodes, fieldkey_from, fieldkey_to, fieldkey_timestamp, fieldkey_nodeId, fieldkey_nodeText, fieldkey_sourcetype, timeReader, colors} = this;
+            var {fieldkey_links, fieldkey_nodes, fieldkey_from, fieldkey_to, fieldkey_timestamp, fieldkey_nodeId, fieldkey_nodeText, fieldkey_sourcetype, timeReader} = this;
             var allLinks = [];
             var allNodes = {};
             var idCache = {};
@@ -1121,7 +1166,6 @@ class TimeSeriesLine {
                 fieldkey_sourcetype = opt.fieldkey_sourcetype || fieldkey_sourcetype;
                 timeReader = opt.timeReader || timeReader;
 
-                
                 var defaultColor = opt.color || getColor();
                 var defaultItemStyle = deepCopy(this.itemStyle);
                 merge_recursive(defaultItemStyle, {
@@ -1194,10 +1238,7 @@ class TimeSeriesLine {
                     }
                     // opt.data[fieldkey_links].forEach(link => {});
                 }
-                var teLink = Date.now();
-                // console.log('也只是一个小循环而已啦', teLink - tsLink, opt.data[fieldkey_links].length);
 
-                var t1 = Date.now();
                 if (opt.data && opt.data[fieldkey_nodes] && opt.data[fieldkey_nodes].length) {
                     var curNodeInfo = opt.data[fieldkey_nodes],
                         curNodeLen = curNodeInfo.length,
@@ -1242,8 +1283,6 @@ class TimeSeriesLine {
                     }
                     // opt.data[fieldkey_nodes].forEach(node => {});
                 }
-                var t2 = Date.now();
-                // console.log('单个图例, 单层所耗时间', t2 - t1, opt.data[fieldkey_nodes].length);
             });
 
             var com = []
@@ -1260,36 +1299,25 @@ class TimeSeriesLine {
             this.legendStates = legendStates;
             this.nodeIdWithTextCache = nodeIdWithTextCache;
         }
-        var t4 = Date.now();
-        // console.log('记录:对节点进行预处理', t4 - t1);
 
-        var t5 = Date.now();
         // sort.call(renderNodes, (n1, n2) => {
         //     return n1.fixed ? -1 : n2.fixed ? 1 : 1;
         // });
         renderNodes.sort((n1, n2) => {
             return n1.fixed ? -1 : n2.fixed ? 1 : 1;
         });
-        var t6 = Date.now();
-        // console.log('排序环节', t6 - t5);
 
-        var t7 = Date.now();
         renderNodes.forEach((node,index) => {
             nodeIndexCache[node['__nodeId']] = index;
         });
-        var t8 = Date.now();
-        // console.log('建立缓存环节', t8 - t7);
 
         this.nodes = renderNodes;
         this.links = links;
         this.nodeIndexCache = nodeIndexCache;
-        
-        var t2 = Date.now();
+
         renderNodes = null;
         nodeIndexCache = null;
         links = null;
-        
-        // console.log('记录:创建渲染节点和线条所需时间', t2 - t1);
     }
 
     // 计算文本最大宽度或高度: 横向时直接计算最长文本宽度, 纵向时计算最长文本高度;
@@ -1408,7 +1436,7 @@ class TimeSeriesLine {
         nodes.forEach((node,index) => {
             nodeIndexCache[node['__nodeId']] = index;
         });
-        // console.log('记录操作条件', fieldKey, valueRange);
+
         // this.nodeSliderFilterParams = {
         //     fieldKey: fieldKey,
         //     range: valueRange
@@ -1457,7 +1485,7 @@ class TimeSeriesLine {
 
     createScaleTimes() {
         var height;
-        var {boundary} = this;
+        var {boundary, offset} = this;
         var scalePercent = this.linearScalePercentWidthValue.setX;
         var {grid} = this.layout;
         // 横向: 从左到右的绘图顺序
@@ -1467,14 +1495,14 @@ class TimeSeriesLine {
             // 比例下的时间戳, 和图例宽度的一个比例关系
             this.linearScaleTimeWithTimestamp = linear([scalePercent(this.startPercent), scalePercent(this.endPercent)], 
                                                         [
-                                                            grid.x + boundary.left,     // 线条并不是从 0 位置开始绘制, 会有一个起止的偏移量, 所以也需要纳入进去
-                                                            grid.x + grid.width - boundary.right
+                                                            grid.x + boundary.left + offset.left,     // 线条并不是从 0 位置开始绘制, 会有一个起止的偏移量, 所以也需要纳入进去
+                                                            grid.x + grid.width - boundary.right - offset.right
                                                         ]);
             // 比例和图例宽度的一个比例关系
             this.linearRenderPercentWithWidth = linear([this.startPercent, this.endPercent],
                                                         [
-                                                            grid.x + boundary.left,     // 线条并不是从 0 位置开始绘制, 会有一个起止的偏移量, 所以也需要纳入进去
-                                                            grid.x + grid.width - boundary.right
+                                                            grid.x + boundary.left + offset.left,     // 线条并不是从 0 位置开始绘制, 会有一个起止的偏移量, 所以也需要纳入进去
+                                                            grid.x + grid.width - boundary.right - offset.right
                                                         ]);
         }
         // 纵向: 从上到下的绘图顺序 
@@ -1482,14 +1510,14 @@ class TimeSeriesLine {
             // 比例下的时间戳, 和图例宽度的一个比例关系
             this.linearScaleTimeWithTimestamp = linear([scalePercent(this.startPercent), scalePercent(this.endPercent)], 
                                                         [
-                                                            grid.y + boundary.top,     // 线条并不是从 0 位置开始绘制, 会有一个起止的偏移量, 所以也需要纳入进去
-                                                            grid.y + grid.height - boundary.bottom
+                                                            grid.y + boundary.top + offset.top,     // 线条并不是从 0 位置开始绘制, 会有一个起止的偏移量, 所以也需要纳入进去
+                                                            grid.y + grid.height - boundary.bottom - offset.bottom
                                                         ]);
             // 比例和图例宽度的一个比例关系
             this.linearRenderPercentWithWidth = linear([this.startPercent, this.endPercent],
                                                         [
-                                                            grid.y + boundary.top,     // 线条并不是从 0 位置开始绘制, 会有一个起止的偏移量, 所以也需要纳入进去
-                                                            grid.y + grid.height - boundary.bottom
+                                                            grid.y + boundary.top + offset.top,     // 线条并不是从 0 位置开始绘制, 会有一个起止的偏移量, 所以也需要纳入进去
+                                                            grid.y + grid.height - boundary.bottom - offset.bottom
                                                         ]);
         }
     }
@@ -1585,9 +1613,10 @@ class TimeSeriesLine {
         if (this.animation.updateRenderNodes) { cancelAnimationFrame(this.animation.updateRenderNodes) }
         this.animation.updateRenderNodes = requestAnimationFrame(()=>{
             var {node, grid, nodeSlider, title} = this.layout;
-            this.erase(node);
-            this.erase(grid);
-            this.erase(nodeSlider);
+            
+            !isBlokHidden(node) && this.erase(node);
+            !isBlokHidden(grid) && this.erase(grid);
+            !isBlokHidden(nodeSlider) && this.erase(nodeSlider);
 
             this.legendStates[data.data] = !this.legendStates[data.data];
             this.updateLegend();
@@ -1650,7 +1679,6 @@ class TimeSeriesLine {
                     height: block.height
                 }, this.eventHandler); // this.canvas2DContext, , this.canvas
             }
-            console.log('走一个...');
             // 阻止浏览器默认右键行为;
             return {
                 stopImmediatePropagation: true,
@@ -1664,9 +1692,11 @@ class TimeSeriesLine {
             color = null,
             titleBackground = this.title.background,
             indicator;
+
         for (var key in blocks) {
             color = this.themeConfig[key][this.legendStates[key] ? 'theme' : 'cancelColor'];
             indicator = blocks[key].indicator;
+
             if (titleBackground) {
                 fillRect(
                     this.canvas2DContext,
@@ -1736,6 +1766,7 @@ class TimeSeriesLine {
             show,
             background
         } = this.title;
+        
         var {nodeTextStyle, offset} = this;
         var {x, y, width, height} = this.layout.title || {};
         var node_x = this.layout.node.x;
@@ -1754,6 +1785,13 @@ class TimeSeriesLine {
         var title_click_area = [];
         // 先擦除再绘制
         this.canvas2DContext.clearRect(x, y, width, height);
+
+        if (!show) {
+            // 更新可点击区域信息;
+            this.registerBlocks = [];
+            this.legendBlocks = [];
+            return
+        }
 
         // 标题的背景:
         if (background) {
@@ -2243,10 +2281,12 @@ class TimeSeriesLine {
     renderGrid () {
         var { background, offset, direction } = this;
         var {x, y, width, height} = this.layout.grid;
-        if (direction === 'horizontal') {
-            fillRect(this.canvas2DContext, x + offset.left, y, width - offset.left - offset.right, height, background);
-        } else {
-            fillRect(this.canvas2DContext, x, y + offset.top, width, height - offset.top - offset.bottom, background);
+        if (!isBlokHidden(this.layout.grid)) {
+            if (direction === 'horizontal') {
+                fillRect(this.canvas2DContext, x + offset.left, y, width - offset.left - offset.right, height, background);
+            } else {
+                fillRect(this.canvas2DContext, x, y + offset.top, width, height - offset.top - offset.bottom, background);
+            }
         }
     }
 
@@ -2340,7 +2380,7 @@ class TimeSeriesLine {
     }
 
     renderNodes (nodes) {
-        var t1 = Date.now();
+
         var renderNodes = nodes || this.renderNodeTask;
         var renderIsFunction = typeof this.nodeTextStyle.formatter === 'function' ? this.nodeTextStyle.formatter : null;
 
@@ -2371,7 +2411,7 @@ class TimeSeriesLine {
             _fieldkey_sourceType = '__sourceType',
             _fieldkey_nodeId = '__nodeId',
             _fieldkey_nodeText = '__text',
-            highLightColor="red";// '__text' this.fieldKey_nodeText;
+            highLightColor="red";// '__text' this.fieldkey_nodeText;
 
         var renderFn = null;
         var renderCount = 0;
@@ -2442,7 +2482,6 @@ class TimeSeriesLine {
                             stackTextHeiht = ty - textHalfHeight;
                             renderCount++;
                             
-                            // console.log('绘制图标', _fieldkey_sourceType, node, node[_fieldkey_sourceType]);
                             if (node[_fieldkey_sourceType] && !imageBeDrawed) {
                                 image = new Image();
                                 image.src = sourceType_icons[node[_fieldkey_sourceType]];
@@ -2564,7 +2603,6 @@ class TimeSeriesLine {
                     _nodeTextStyle.background
                 )
             }
-            // console.log('配置', _nodeTextStyle, _offset);
             var node_padding_top = _nodeTextStyle.padding.top,
                 node_padding_bottom = _nodeTextStyle.padding.bottom,
                 grid_offset_top = _offset.top,
@@ -2718,8 +2756,7 @@ class TimeSeriesLine {
                 };
             }
         }
-        var t2 = Date.now();
-        // console.log('初步设定不会要多久', t2 - t1);
+
         // renderFn && renderNodes.forEach(renderFn);
         if (renderFn) {
             var nodeLen = renderNodes.length;
@@ -2731,7 +2768,7 @@ class TimeSeriesLine {
         if (_gridLineStyle.dash) {
             _canvasContext.setLineDash([]);
         }
-        // console.log('文本计算最大宽高', this.maxAxisTextWidthOrHeight);
+
         renderNodes = null;
         renderIsFunction = null;
         // this.canvas2DContext.globalCompositeOperation = 'source-atop';
@@ -2754,8 +2791,6 @@ class TimeSeriesLine {
         renderFn = null;
         stackTextHeiht = null;
         nodeLen = null;
-        var t3 = Date.now();
-        // console.log('渲染节点所需时间', t3 - t2, t3 - t1, '节点数量', renderCount);
     }
 
     renderGridLines (nodes) {
@@ -3001,12 +3036,11 @@ class TimeSeriesLine {
         _fieldkey_timestamp = null;
         _dateIsString = null;
         renderFn = null;
-        // console.log('记录:渲染线条所需时间', t3 - t2, t3 - t2);
     }
 
 
     initEventHandler () {
-        // console.log('为图例挂载事件, 尚缺乏缩放和拖动...');
+
         // this.eventHandler.removeEvent('mousemove', this.setHover);
         // this.eventHandler.removeEvent('mousewheel', this.scaleChart);
         // this.eventHandler.removeEvent('mousedown', this.saveGrid);
@@ -3050,11 +3084,12 @@ class TimeSeriesLine {
                             try {
                                 txt = links.map((link,index) => {
                                     return `<div style="margin-bottom:${index===links.length-1?0:5}px;">
-                                                <p>文本: ${nodeIdWithTextCache[link.__from]} -> ${nodeIdWithTextCache[link.__to]}</p>
-                                                <p>节点id: ${link.__from} -> ${link.__to}</p>
-                                                <p>时间: ${formatDate(getDate(link.__timestamp), 'yyyy-MM-dd hh:mm:ss')}</p>
+                                                <p class="timeAxis-tooltip-text">文本: ${nodeIdWithTextCache[link.__from]} -> ${nodeIdWithTextCache[link.__to]}</p>
+                                                <p class="timeAxis-tooltip-text">节点id: ${link.__from} -> ${link.__to}</p>
+                                                <p class="timeAxis-tooltip-text">时间: ${formatDate(getDate(link.__timestamp), 'yyyy-MM-dd hh:mm:ss')}</p>
                                             </div>`
                                 }).join('');
+                                txt = `<style>.timeAxis-tooltip-text{margin:0;padding:0;}</style>${txt}`
                             } catch (e) { console.warn('测试发现异常', e) };
                         };
 
@@ -3085,7 +3120,6 @@ class TimeSeriesLine {
                 delete link._isHovered;
             });
             // this.hoveredImageDatas.forEach(toPutImageData => {
-            //     console.log('当前的', toPutImageData);
             //     this.canvas2DContext.clearRect(toPutImageData.x, toPutImageData.y, toPutImageData.imageData.width, toPutImageData.imageData.height);
             //     this.canvas2DContext.putImageData(toPutImageData.imageData, 70, 70);
             // });
@@ -3273,11 +3307,11 @@ class TimeSeriesLine {
         };
 
         if (this.animation.scrollHandler) { 
-            // console.log('执行多次');
+
             cancelAnimationFrame(this.animation.scrollHandler);
         };
         this.animation.scrollHandler = requestAnimationFrame(()=>{
-            // console.log('执行一次...');
+
             // var scalePercent = this.linearScalePercentWidthValue.setX;
             // this.linearScaleTimeWithTimestamp = linear([scalePercent(this.startPercent), scalePercent(this.endPercent)], [0, width]);
             // _x + _maxAxisTextWidthOrHeight + _offset.left + _boundary.left + (_linearScaleTimeWithTimestamp.setX(timeReader(link[_fieldkey_timestamp])) || 0) + _padding.left;
@@ -3310,7 +3344,6 @@ class TimeSeriesLine {
 
             // this.transform.x = newPos.x;
             // this.transform.y = newPos.y;
-            // console.log('查看位置的差值', newPos.x - this.transform.x);
             
             this.startPercent = newPercent.startValue;
             this.endPercent = newPercent.endValue;
@@ -3354,7 +3387,6 @@ class TimeSeriesLine {
     }
 
     clearMove = (e, canvas, data) => {
-        // console.log('清除....');
         this.eventHandler.removeEvent('mousemove', this.moveGrid);
         this.eventHandler.removeEvent('mouseup', this.clearMove);
 
@@ -3449,7 +3481,6 @@ class TimeSeriesLine {
                 scaleHelp.endValue = newPercent.endValue;
                 scaleHelp.k = scaleK;
 
-                // console.log('查看, 新的百分比', this.startPercent, this.endPercent);
                 this.erase();
                 this.initTimeRange();
 
@@ -3487,21 +3518,17 @@ class TimeSeriesLine {
                         // if (this.animation.renderNodes) { cancelAnimationFrame(this.animation.renderNodes) };
                         // this.animation.renderNodes = requestAnimationFrame(
                         //     ()=>{
-                                var tNodeStart = Date.now();
+                                
                                 this.renderNodeSlider();
                                 this.renderNodes();
                                 this.nodeMarkHandler();
-                                var tNode = Date.now();
-                                // console.log('记录:绘制坐标文本时间节点', tNode - tNodeStart, tNode - t1);
+                                
                             // }, 0);
                         
                         // if (this.animation.renderLinks) { cancelAnimationFrame(this.animation.renderLinks) };
                         // this.animation.renderLinks = requestAnimationFrame(
                             // ()=>{
-                                var tLinkStart = Date.now();
                                 this.renderLinks();
-                                var tLink = Date.now();
-                                // console.log('记录:绘制线条时间节点', tLink - tLinkStart, tLink - t1);
                             // }, 15);
                     // }, 0);
             }, 16);
@@ -3580,7 +3607,7 @@ class TimeSeriesLine {
         var basePos = 0;
         var getDate = (v) => this.timestampIsString ? this.timeReader(v) : v;
         
-        var t1 = Date.now();
+
         if (this.direction === 'horizontal') {
 
             // 依赖构造出的渲染线条, 在渲染出来的形状中, 去匹配筛选以尽量减少匹配的数量复炸度
@@ -3637,8 +3664,6 @@ class TimeSeriesLine {
                 }
             });
 
-            var t2 = Date.now();
-            // console.log('遍历找节点', t2 - t1);
             return inArea;
         } else {
             // 依赖构造出的渲染线条, 在渲染出来的形状中, 去匹配筛选以尽量减少匹配的数量复炸度
