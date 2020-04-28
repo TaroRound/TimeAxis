@@ -1,12 +1,12 @@
 <template>
   <div class="hello">
     <h1>测试时间轴</h1>
-    <div id="timeAxis"></div>
+    <div id="timeAxis" style="width: 1200px; height: 600px;"></div>
   </div>
 </template>
 
 <script>
-import * as TimeAxis from 'TimeAxis';
+import TimeAxis from '../../../dist/index.js';
 
 export default {
   name: 'HelloWorld',
@@ -16,20 +16,42 @@ export default {
     }
   },
   mounted () {
-    console.log('方法详情', TimeAxis, TimeAxis.default);
     var timeAxisInstance = new TimeAxis('#timeAxis', {
       series: [
         {
-          nodes: [
-            {nodeId: 111, name: '一号'},
-            {nodeId: 222, name: '二号'},
-            {nodeId: 333, name: '三号'}
-          ],
-          links: [
-            {nodeId: 111, to: 333, timestamp: '2019-01-02'},
-            {nodeId: 111, to: 222, timestamp: '2019-01-04'},
-            {nodeId: 222, to: 333, timestamp: '2019-01-05'}
-          ]
+          name: '示例1',
+          title: {
+            show: true
+          },
+          data: {
+            nodes: [
+              {nodeId: 111, text: '一号'},
+              {nodeId: 222, text: '二号'},
+              {nodeId: 333, text: '三号'}
+            ],
+            links: [
+              {from: 111, to: 333, timestamp: '2019-01-02'},
+              {from: 111, to: 222, timestamp: '2019-01-04'},
+              {from: 222, to: 333, timestamp: '2019-01-05'}
+            ]
+          }
+        }, {
+          name: '示例2',
+          title: {
+            show: true
+          },
+          data: {
+            nodes: [
+              {nodeId: 111, text: '一号'},
+              {nodeId: 222, text: '二号'},
+              {nodeId: 333, text: '三号'}
+            ],
+            links: [
+              {from: 111, to: 333, timestamp: '2019-01-02'},
+              {from: 111, to: 222, timestamp: '2019-01-04'},
+              {from: 222, to: 333, timestamp: '2019-01-05'}
+            ]
+          }
         }
       ]
     });
