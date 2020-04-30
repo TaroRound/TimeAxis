@@ -108,8 +108,6 @@ import fillText from './shape/text';
                 index: 1,
                 name: '话单', 
                 background: '#f78989',
-                filter: true,
-                sort: [],
                 data: {
                     nodes: [], 
                     links: []
@@ -118,8 +116,6 @@ import fillText from './shape/text';
             {   
                 name: '群组', 
                 background: '#d5d5d5',
-                filter: true,
-                sort: [],
                 groupId: '11',
                 data: {
                     nodes: [], 
@@ -130,8 +126,6 @@ import fillText from './shape/text';
                 name: '短信', 
                 background: '#f40',
                 groupId: '11',
-                filter: true,
-                sort: [],
                 data: {
                     nodes: [], 
                     links: []
@@ -140,8 +134,6 @@ import fillText from './shape/text';
             {   
                 name: '彩信', 
                 background: 'blue',
-                filter: true,
-                sort: [],
                 groupId: '22',
                 data: {
                     nodes: [], 
@@ -212,7 +204,7 @@ class TimeStaticChart extends Chart {
         this.timeTickInstance = null;
         this.chartInstance = [];
         this.eventHandler = null;
-        this.tickRenderStart = direction === 'horizontal' ? tickRenderStart || 160 : 60;
+        this.tickRenderStart = this.direction === 'horizontal' ? tickRenderStart || 140 : 60;
         //
         this.fieldkey_timestamp = fieldkey_timestamp || 'timestamp';
         this.fieldkey_nodeId = fieldkey_nodeId || 'nodeId';
@@ -488,10 +480,10 @@ class TimeStaticChart extends Chart {
                         stackMargin.top = (margin.top || 0) * i;
                         stackMargin.bottom = (margin.bottom || 0) * i;
                         steps.push({
-                            x: leftPadding,
-                            y: topPadding + ty + stackMargin.top + (i == 0 ? 0 : stackMargin.bottom),
-                            width: everyChartWidth,
-                            height: everyChartHeight,
+                            x: Math.round(leftPadding),
+                            y: Math.round(topPadding + ty + stackMargin.top + (i == 0 ? 0 : stackMargin.bottom)),
+                            width: Math.round(everyChartWidth),
+                            height: Math.round(everyChartHeight),
                             type: 'chart',
                             groupId: groupedData.groupKeys[i],
                             name: notRightId
@@ -504,8 +496,8 @@ class TimeStaticChart extends Chart {
                                 // stackMargin.top = stackMargin.top - (margin.top || 0);
                                 // stackMargin.bottom = stackMargin.bottom - (margin.bottom || 0);
                                 steps.push({
-                                    x: leftPadding,
-                                    y: topPadding + ty + stackMargin.top + stackMargin.bottom,
+                                    x: Math.round(leftPadding),
+                                    y: Math.round(topPadding + ty + stackMargin.top + stackMargin.bottom),
                                     width: this.axis.width,
                                     height: this.axis.height,
                                     type: 'axis',
@@ -530,10 +522,10 @@ class TimeStaticChart extends Chart {
                         var notRightId = groupedData[groupedData.groupKeys[i]][0].name;
                         
                         steps.push({
-                            x: leftPadding + tx + (margin.top || 0) * i + (margin.bottom || 0) * i,
+                            x: Math.round(leftPadding + tx + (margin.top || 0) * i + (margin.bottom || 0) * i),
                             y: topPadding,
-                            width: everyChartWidth,
-                            height: everyChartHeight,
+                            width: Math.round(everyChartWidth),
+                            height: Math.round(everyChartHeight),
                             type: 'chart',
                             groupId: groupedData.groupKeys[i],
                             name: notRightId
@@ -545,7 +537,7 @@ class TimeStaticChart extends Chart {
                             
                             if (this.axis.insertIndex === i) {
                                 steps.push({
-                                    x: leftPadding + tx + (margin.top || 0) * i + (margin.bottom || 0) * i,
+                                    x: Math.round(leftPadding + tx + (margin.top || 0) * i + (margin.bottom || 0) * i),
                                     y: topPadding,
                                     width: this.axis.width,
                                     height: this.axis.height,
@@ -572,9 +564,10 @@ class TimeStaticChart extends Chart {
     
     getDefaultMargin () {
         var titleHeight, offset, boundary, padding, tickRenderStart, minCellWidth, margin, nodePadding;
+
         if (this.direction === 'horizontal') {
             titleHeight = this.titleHeight || 40;
-            offset = this.chartOffset || { top: 10, bottom: 10, left: 10, right: 10 };
+            offset = this.chartOffset || { top: 10, bottom: 10, left: 10, right: 0 };
             boundary = this.chartBoundary || { left: 15, right: 15, top: 0, bottom: 0 };
             padding = this.chartPadding || { top: 0, bottom: 0, left: 0, right: 0 };
             margin = this.chartMargin || { top: 0, bottom: 0, left: 0, right: 0 };
@@ -583,7 +576,7 @@ class TimeStaticChart extends Chart {
             minCellWidth = this.minCellWidth || 0;
         } else {
             titleHeight = this.titleHeight || 40;
-            offset = this.chartOffset || { top: 0, bottom: 10, left: 10, right: 10 };
+            offset = this.chartOffset || { top: 0, bottom: 10, left: 10, right: 0 };
             boundary = this.chartBoundary || { top: 15, bottom: 15, left: 0, right: 0 };
             padding = this.chartPadding || { top: 0, bottom: 0, left: 0, right: 0 };
             margin = this.chartMargin || { top: 0, bottom: 0, left: 0, right: 0 };
@@ -736,6 +729,7 @@ class TimeStaticChart extends Chart {
                         nodeTextStyle = Object.assign({}, nodeTextStyle, first.nodeTextStyle); // first.nodeTextStyle || nodeTextStyle
                         itemStyle = first.itemStyle;
                     }
+
                     var setting = Object.assign({}, layout, { 
                         direction: this.direction,
                         offset: offset,
@@ -756,7 +750,6 @@ class TimeStaticChart extends Chart {
                         saferange: endValue - startValue,
                         min: min,
                         max: max,
-                        sort: i,
                         reverse: axisIndex === -1 ? false : i < axisIndex,   // 绘图顺序: 从上到下, 从左到右;
                         timeReader: SYS_DB_TIMEDATE_READER,
                         chartId: layout.groupId,
@@ -926,38 +919,38 @@ class TimeStaticChart extends Chart {
             if (this.direction === 'horizontal') {
                 switch (position) {
                     case 'top':
-                        boxModer.y = boundary.y;
+                        boxModer.y = Math.round(boundary.y);
                         break;
                     // case 'middle':
                         // boxModer.y = boundary.y + (boundary.height - sliderHeight)/2;
                         break;
                     case 'bottom':
-                        boxModer.y = boundary.y + (boundary.height - sliderHeight);
+                        boxModer.y = Math.round(boundary.y + (boundary.height - sliderHeight));
                         break;
                     default:
-                        boxModer.y = boundary.y + (boundary.height - sliderHeight);
+                        boxModer.y = Math.round(boundary.y + (boundary.height - sliderHeight));
                         break;
                 }
-                boxModer.x = boundary.x;
-                boxModer.width = boundary.width;
+                boxModer.x = Math.round(boundary.x);
+                boxModer.width = Math.round(boundary.width);
                 boxModer.height = sliderHeight;
             } else {
                 switch (position) {
                     case 'left':
-                        boxModer.x = boundary.x;
+                        boxModer.x = Math.round(boundary.x);
                         break;
                     // case 'center':
                     //     boxModer.x = boundary.x + (boundary.width - sliderHeight)/2;
                         break;
                     case 'right':
-                        boxModer.x = boundary.x + (boundary.width - sliderHeight);
+                        boxModer.x = Math.round(boundary.x + (boundary.width - sliderHeight));
                         break;
                     default: 
-                        boxModer.x = boundary.x + (boundary.width - sliderHeight);
+                        boxModer.x = Math.round(boundary.x + (boundary.width - sliderHeight));
                         break;
                 }
-                boxModer.y = boundary.y;
-                boxModer.width = sliderHeight;
+                boxModer.y = Math.round(boundary.y);
+                boxModer.width = Math.round(sliderHeight);
                 boxModer.height = boundary.height;
             }
 
@@ -1603,8 +1596,81 @@ class TimeStaticChart extends Chart {
     // {@param.eventType} 必要参数; 事件类型, 支持的事件类型应该有: setDataZoom(设置数据缩放), legendChange(设置选中), timetickSelect(刻度尺选中) 等事件
     // {@param.eventDesc} 非必要参数; 派发事件时携带的条件, 比如只对某一个图例中的某一条数据的点击, 选中;
     // {@param.data} 非必要参数; 派发事件时传递的参数;
-    dispatchEvent (eventType, eventDesc, param) {
+    dispatchAction (eventDesc) {
+        var eventType = eventDesc.type;
+        var data = eventDesc.data || {};
+        var callback = [];
 
+        switch (eventType.toLowerCase()) {
+            // 派发数据缩放的事件: 可能是对整个图例缩放, 可能只是对其中某一个图进行缩放; 通过 groupId(也即图例的唯一 id进行判断);
+            case 'datazoom':
+                if (eventDesc.groupId) {
+                    var newFunc = new Function(['context', 'eventDesc'], `
+                        for(var i=0; i< context.chartInstance.length; i++) {
+
+                            if(context.chartInstance[i].uid === eventDesc.groupId) {
+
+                                    if (context.chartInstance[i].dataZoomInstance) {
+                                        context.chartInstance[i].dataZoomInstance.update({
+                                            startValue: parseFloat(eventDesc.start),
+                                            endValue: parseFloat(eventDesc.end)
+                                        });
+                                    }
+                                context.chartInstance[i].updateRenderNodes(null, { percent: [parseFloat(eventDesc.start), parseFloat(eventDesc.end)] });
+                                break;
+                            }
+                        }
+                    `);
+                    callback.push(newFunc);
+                } else {
+                    var newFunc = new Function(['context', 'eventDesc'], `
+                        if (context.dataZoomInstance) {
+                            context.dataZoomInstance.update({
+                                startValue: parseFloat(eventDesc.start),
+                                endValue: parseFloat(eventDesc.end)
+                            });
+                            context.updateChartInstance(null, { percent: [parseFloat(eventDesc.start), parseFloat(eventDesc.end)] });
+                        }
+                    `)
+                    callback.push(newFunc);
+                }
+                break;
+            // 图例图层的选中事件
+            case 'legendselect':
+                if (eventDesc.data) {
+                    var groupId = eventDesc.data.groupId,
+                        name = eventDesc.data.name;
+                    if (groupId && name) {
+                        var newFunc = new Function(['context', 'eventDesc'], `
+                            for(var i=0; i< context.chartInstance.length; i++) {
+
+                                if(context.chartInstance[i].uid === eventDesc.groupId) {
+
+                                        if (context.chartInstance[i].dataZoomInstance) {
+                                            context.chartInstance[i].dataZoomInstance.update({
+                                                startValue: parseFloat(eventDesc.start),
+                                                endValue: parseFloat(eventDesc.end)
+                                            });
+                                        }
+                                    context.chartInstance[i].updateRenderNodes(null, { percent: [parseFloat(eventDesc.start), parseFloat(eventDesc.end)] });
+                                    break;
+                                }
+                            }
+                        `);
+                        callback.push(newFunc);
+                    }
+                }
+                break;
+            // 图例图层的取消选中事件
+            case 'legendunselect':
+
+                break;
+        }
+
+
+        callback.forEach((func) => {
+            func(this, eventDesc);
+        });
     }
 
 

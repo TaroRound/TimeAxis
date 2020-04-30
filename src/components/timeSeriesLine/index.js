@@ -116,7 +116,6 @@ class TimeSeriesLine {
         max,            // 最小时间戳
         smooth,         // 是否开启平滑滚动
         title,          // 头部: 图形标题文本
-        sort,           // 头部: 排序相关
         reverse,        // 竖坐标节点排列顺序是否倒序
         fixColumns,     // 竖坐标节点要固定的项 id列表
         background,     // 网格背景, 可接受一个颜色值或是一个渐变(仅实现一个渐变, 特定的文本格式: to right: 0% #000: 50% #ccc: 100% #fff)
@@ -156,6 +155,7 @@ class TimeSeriesLine {
         this.height = height || 0;
         this.direction = direction || 'horizontal';
 
+        // 存储各个小单元的布局信息
         this.layout = {
             title: {},
             node: {},
@@ -164,26 +164,27 @@ class TimeSeriesLine {
             indicator: {}
         }
 
-        this.startPercent = startPercent || 0;
-        this.endPercent = endPercent || 100;
-        this.min = min || 0;
-        this.max = max || 0;
-        this.smooth = !!smooth;
-        this.title = title || {};
-        this.sort = sort || 0;
-        this.reverse = !!reverse;
-        this.fixColumns = fixColumns || null;
+        
+        this.startPercent = startPercent || 0;  // 数据绘制的百分比起点
+        this.endPercent = endPercent || 100;    // 数据绘制的百分比终点
+        this.min = min || 0;    // 数据绘制的最大值
+        this.max = max || 0;    // 数据绘制的最小值
+        this.smooth = !!smooth; // 默认已经使用平滑效果, 这个平滑指代的图例更新操作时, 是否是立即绘制;
+        this.title = title || {};   // 标题的配置项
+        this.reverse = !!reverse;   // 当前图例的节点绘制顺序是否反转, 默认为false; 顺序为从上到下,从左到右的绘制顺序;
+        this.fixColumns = fixColumns || null;   // 暂无实现的功能, 固定节点的 id列表
 
+        // 节点筛选的默认配置;
         this.nodeSlider = merge_recursive({
             show: false,
             position: 'start',
-            sliderHeight: 15,
+            sliderHeight: 10,
             outer: {
-                background: 'rgba(255,255,255,0.3)',
-                stroke: 'rgba(0,0,0,0.2)'
+                background: 'transparent',
+                stroke: null
             },
             inner: {
-                background: 'rgba(0,0,0,0.3)',
+                background: 'rgba(0,0,0,0.2)',
                 stroke: null
             },
             boundaryText: {
@@ -191,17 +192,17 @@ class TimeSeriesLine {
             },
             resizerStyle: {
                 width: 4,
-                height: 6,
+                height: 10,
                 color: 'rgba(0,0,0,0)',
-                position: 'center'
+                position: 'inner'
             }
         }, nodeSlider || {show: !!minCellWidth });
 
-        this.minCellWidth = nodeSlider && nodeSlider.show ? minCellWidth || 1 : minCellWidth || 0;
-        this.titleHeight = titleHeight || 0; // 40;
-        this.timeunit = timeunit || 'year';
-        this.timeReader = timeReader;
-        this.timestampIsString = timestampIsString;
+        this.minCellWidth = nodeSlider && nodeSlider.show ? minCellWidth || 1 : minCellWidth || 0;  // 节点数量较大时, 是否使用最小间距的配置
+        this.titleHeight = titleHeight || 0; // 40; // 标题的高度
+        this.timeunit = timeunit || 'year'; // 时间粒度; 暂无实现的功能; 该功能需要对数据依据年, 季度, 月份等和节点 id对数据进行统计分类; 然后绘制分类后的数据;
+        this.timeReader = timeReader;   // 可选的配置, 比如如果连线的数据是日期格式字符串, 只想要以年份作为时间线来显示, 就需要设置 timeReader
+        this.timestampIsString = timestampIsString;     // 时间戳是否为字符串
         this.fieldkey_links = fieldkey_links || 'links';
         this.fieldkey_nodes = fieldkey_nodes || 'nodes';
         this.fieldkey_nodeId = fieldkey_nodeId || 'nodeId';
@@ -210,11 +211,11 @@ class TimeSeriesLine {
         this.fieldkey_timestamp = fieldkey_timestamp || 'timestamp';
         this.fieldkey_nodeText = fieldkey_nodeText || 'text';
         this.fieldkey_sourcetype = fieldkey_sourcetype || 'sourceType';
-        this.tooltip = tooltip || {show: true};
+        this.tooltip = tooltip || {show: true}; // 提示框的默认配置
         this.saferange = saferange || this.endPercent - this.startPercent;
         
-        this.colors = colors || color;
-        this.itemStyle = merge_recursive({
+        this.colors = colors || color;          // 默认颜色
+        this.itemStyle = merge_recursive({      // 线条样式的默认配置
             line: {
                 normal: {
                     color: '#fff',
@@ -251,25 +252,27 @@ class TimeSeriesLine {
             },
             shadow: {}
         }, itemStyle);
-        this.themeConfig = null;
+        this.themeConfig = null;                // 所有图层的样式的一个缓存
 
         this.uid = chartId !== undefined ? chartId : getUUid();
-        this.eventHandler = eventHandler || {};
+        this.eventHandler = eventHandler || {}; // 事件处理对象;
         this.canvas = canvas || null;
         this.optionsList = optionList || [];
         this.background = background || 'to bottom:0% #75A4FF:100% #4258E5'; // `to ${direction === 'horizontal' ? 'right' : 'bottom'}: 0 #f0f0f0: 50% rgba(0,0,0,0.2): 100% #f0f0f0`
         this.chartBackground = chartBackground;
 
-        this.linearScalePercentWidthValue = linear([0, 100], [this.min, this.max]);
-        this.linearScaleNodesWithIndex = null;
-        this.linearScaleTimeWithTimestamp = null;
-        this.linearRenderPercentWithWidth = null;
-        this.maxAxisTextWidthOrHeight = maxAxisTextWidthOrHeight || null;
-        this.nodeTextStyle = merge_recursive({
+        this.linearScalePercentWidthValue = linear([0, 100], [this.min, this.max]);     // 最大最小值和百分比的一个比例关系
+        this.linearScaleNodesWithIndex = null;              // 节点索引和坐标位置的一个比例关系
+        this.linearScaleTimeWithTimestamp = null;           // 时间戳和图例宽度的一个比例关系
+        this.linearRenderPercentWithWidth = null;           // 当前绘制的起止百分比和图例宽度的比例关系
+        this.linearIndexWithPercent = null;                 // 节点排序最大最小值 和百分比的一个比例关系;
+
+        this.maxAxisTextWidthOrHeight = maxAxisTextWidthOrHeight || null;   // 文本区域的宽
+        this.nodeTextStyle = merge_recursive({                              // 文本样式的默认配置
             fontSize: 12,
             color: '#666',
             background: null,
-            padding: {      // 这个值会被网格继承, 因为要保持文本和线条的位置一致
+            padding: {      // 这个值会跟网格的边距进行比较取最大值, 因为要保持文本和线条的位置一致
                 left: 0,
                 right: 0,
                 top: 0,
@@ -277,16 +280,12 @@ class TimeSeriesLine {
             }
         }, nodeTextStyle || {});
 
-        this.gridLineStyle = merge_recursive({
+        this.gridLineStyle = merge_recursive({              // 网格线的默认配置
             dash: undefined, // [5, 10, 5, 10]
             color: '#DCDFE6'
         }, splitLine || {});
 
-        this.linkLineStyle = {
-            color: '#fff',
-            activeColor: 'red'
-        }
-        this.timestampInstance = null;
+        this.timestampInstance = null;                      // 时间格式的一个示例
         this.startTime = null;
         this.endTime = null;
         this.layers = [];   // 图层信息
@@ -294,9 +293,9 @@ class TimeSeriesLine {
         this.links = [];    // 所有 待绘制的链接线-缓存
         this.renderNodeTask = [];    // 绘制节点的任务队列
         this.renderLinkTask = [];    // 绘制节点的任务队列
-        this.renderNodeFilterFieldKey = undefined;
-        this.renderNodeFilterValueRange = [];
-        this.renderNodeValueRange = [];
+        this.renderNodeFilterFieldKey = undefined;  // 当前排序依据字段
+        this.renderNodeFilterValueRange = [];   // 当前排序的值范围
+        this.renderNodeValueRange = [];         // 当前排序字段的最大最小值;
 
         this.nodeIndexCache = {} // 保持所有节点的索引的一个对象, 以根据节点 id快速查找到节点索引位置
 
@@ -304,11 +303,11 @@ class TimeSeriesLine {
         this.offset = Object.assign({top: 10, bottom: 10, left: 10, right: 10}, offset || {}); // 网格线与网格之间的间距
         this.boundary = Object.assign({top: 10, bottom: 10, left: 10, right: 10}, boundary || {});   // 链接线条与网格之间的间距
         this.padding = Object.assign({top: 0, bottom: 0, left: 0, right: 0}, padding || {});
-        this.grid = {};
 
         this.animation = {};
         this.renderedLinkShape = [];
         this.hoveredLinks = [];
+        this.legendStates = {};
 
         this.eventRecord = [];
         this.registerBlocks = [];
@@ -327,9 +326,10 @@ class TimeSeriesLine {
                 return option.data && option.data[fieldkey_nodes] && option.data[fieldkey_nodes].length > 0;
             });
             if (hasNodes) {
+                this.status = 1;
                 this.init();
             } else {
-                // this.createGrid();
+                this.status = 0;
                 this.errorHandler({
                     type: 'warn',
                     message: '无数据',
@@ -374,8 +374,13 @@ class TimeSeriesLine {
             // 清除自定义事件
             for (var i = 0; i < this.eventRecord.length; i++ ) {
                 this.eventManager.disposeAll(this.eventRecord[i]);
-            };
+            };    
         }
+
+        // 清除右击事件;
+        this.markAres.length = 0;
+        // 清除缓存的线条数据
+        this.renderedLinkShape.length = 0;
 
         if (this.dataZoomInstance) {
             this.dataZoomInstance.destroy();
@@ -409,13 +414,15 @@ class TimeSeriesLine {
             this.initLayout()
             var {title, node, grid, nodeSlider, indicator} = this.layout;
             if (this.nodes.length === 0 && this.links.length === 0) {
-
+                this.status = 0;
                 this.errorHandler({
                     type: 'warn',
                     message: '无数据',
                     text: '无数据'
                 }, grid);
                 return;
+            } else {
+                this.status = 1;
             }
 
             this.filterNodeAndLinksByLegend();
@@ -466,7 +473,7 @@ class TimeSeriesLine {
     update (options, data) {
         var mergeOptions = {};
         // 允许被修改的属性配置
-        var safeAttrs = 'x,y,width,height,direction,startPercent,endPercent,min,max,smooth,sort,reverse,color,fixColumns,timeunit,boundary,offset,padding,maxAxisTextWidthOrHeight,minCellWidth,nodeTextStyle';
+        var safeAttrs = 'x,y,width,height,direction,startPercent,endPercent,min,max,smooth,reverse,color,fixColumns,timeunit,boundary,offset,padding,maxAxisTextWidthOrHeight,minCellWidth,nodeTextStyle';
         var safeAttribute = safeAttrs.split(',');
 
         if (options) {
@@ -502,14 +509,15 @@ class TimeSeriesLine {
             // 如果数据有更新: 那么需要对图形整个的刷新
             if (data) {
                 if (data.length === 0) {
-                    this.createGrid();
+                    this.status = 0;
                     this.errorHandler({
                         type: 'warn',
                         message: '无数据',
                         text: '无数据'
                     });
-
                     return;
+                } else {
+                    this.status = 1;
                 }
                 layers = this.optionsList.slice(0, data.length);
                 merge_recursive(layers, data);
@@ -530,12 +538,15 @@ class TimeSeriesLine {
 
                 var {title, node, grid, nodeSlider, indicator} = this.layout;
                 if (this.nodes.length === 0 && this.links.length === 0) {
+                    this.status = 0;
                     this.errorHandler({
                         type: 'warn',
                         message: '无数据',
                         text: '无数据'
                     }, grid);
                     return;
+                } else {
+                    this.status = 1;
                 }
                 
                 this.filterNodeAndLinksByLegend();
@@ -607,12 +618,15 @@ class TimeSeriesLine {
                     // this.erase(title);
                     // this.erase(nodeSlider);
                     this.erase({});
+                    this.status = 0;
                     this.errorHandler({
                         type: 'warn',
                         message: '无数据',
                         text: '无数据'
                     }, grid);
                     return;
+                } else {
+                    this.status = 1;
                 }
 
                 this.filterNodeAndLinksByLegend();
@@ -942,27 +956,6 @@ class TimeSeriesLine {
         this.timestampInstance = instance
     }
 
-    createGrid () {
-        var x, y, width, height;
-        if (this.direction === 'horizontal') {
-            x = this.x + this.maxAxisTextWidthOrHeight + this.offset.left + this.padding.left;
-            y = this.y + this.titleHeight + this.padding.top;
-            width = this.width - this.maxAxisTextWidthOrHeight - this.offset.left - this.padding.left - this.offset.right - this.padding.right; //  - this.offset.right
-            height = this.height - this.titleHeight - this.padding.top - this.padding.bottom;
-        } else {
-            x = this.x + this.padding.left;
-            y = this.y + this.maxAxisTextWidthOrHeight + this.titleHeight + this.offset.top + this.padding.top;
-            width = this.width - this.padding.left - this.padding.right;
-            height = this.height - this.titleHeight - this.maxAxisTextWidthOrHeight - this.offset.top - this.offset.bottom - this.padding.top - this.padding.bottom; //  - this.offset.bottom
-        }
-
-        this.grid.x = x;
-        this.grid.y = y;
-        this.grid.width = width;
-        this.grid.height = height;
-        this.grid.background = this.background;
-    }
-
     erase ({x, y, width, height}) {
         this.canvas2DContext.clearRect(x || this.x, y || this.y, width || this.width, height || this.height);
     }
@@ -984,6 +977,8 @@ class TimeSeriesLine {
             legend = null,
             combine = null,
             combineLayer = null,
+            nodeFind = null,
+            linkFind = null,
             isShow = this.optionsList.some(option => option.title && (option.title.show == undefined || option.title.show));
 
         try {
@@ -1056,6 +1051,20 @@ class TimeSeriesLine {
                         disable: false
                     }
                 }
+
+                // 查找节点
+                if (title.nodeFind && title.nodeFind.show) {
+                    nodeFind = {
+                        show: true
+                    }
+                }
+
+                // 查找连接线
+                if (title.linkFind && title.linkFind.show) {
+                    linkFind = {
+                        show: true
+                    }
+                }
                 
                 // 图层列表
                 if (option.name) {
@@ -1087,6 +1096,8 @@ class TimeSeriesLine {
         this.title.legend = legend;
         this.title.combine = combine;
         this.title.combineLayer = combineLayer;
+        this.title.nodeFind = nodeFind;
+        this.title.linkFind = linkFind;
     }
 
     initTimeRange () {
@@ -1441,6 +1452,7 @@ class TimeSeriesLine {
         //     fieldKey: fieldKey,
         //     range: valueRange
         // }
+        this.linearIndexWithPercent = linear([0, 100], maxValueRange);
         this.renderNodeTask = nodes;
         this.renderLinkTask = links;
         this.renderNodeFilterFieldKey = fieldKey;
@@ -1594,6 +1606,9 @@ class TimeSeriesLine {
         this.$links = exportLink;
     }
 
+    findNodes = (e, canvas, data) => {
+        console.log('查找节点', data);
+    }
     filterNodes = (e, canvas, data) => {
         console.log('筛选节点', data);
     }
@@ -1806,16 +1821,18 @@ class TimeSeriesLine {
         }
         if (this.direction === 'horizontal') {
 
-            // 筛选
+            
+
+            // 节点查找
             if (this.title.filter && this.title.filter.show) {
                 fillText(
                     this.canvas2DContext,
                     node_x, 
                     y + height / 2,
-                    '筛选',
+                    '查找',
                     Object.assign({}, { align: 'left', verticle: 'middle', fontSize: fontSize })
                 );
-                currentTextWidth = calcTextWidth('筛选', fontSize + 'px ' + sysFontFamily, this.canvas2DContext);
+                currentTextWidth = calcTextWidth('查找', fontSize + 'px ' + sysFontFamily, this.canvas2DContext);
                 stackWidth = node_x + currentTextWidth + defaultMargin;
 
                 curBlockX = node_x;
@@ -1823,13 +1840,38 @@ class TimeSeriesLine {
                 curBlockWidth = currentTextWidth;
                 curBlockHeight = fontSize;
                 title_click_area.push({
-                    // name: '筛选',
-                    name: 'filter_' + this.uid + ':filterNodes:' + this.uid + ':' + `${curBlockX},${curBlockY},${curBlockWidth},${curBlockHeight}`,
+                    // name: '查找',
+                    name: 'filter_' + this.uid + ':findNodes:' + this.uid + ':' + `${curBlockX},${curBlockY},${curBlockWidth},${curBlockHeight}`,
                     x: curBlockX,
                     y: curBlockY,
                     width: curBlockWidth,
                     height: curBlockHeight
                 });
+            }
+
+            // 筛选
+            if (this.title.nodeFind && this.title.nodeFind.show) {
+                fillText(
+                    this.canvas2DContext,
+                    stackWidth, 
+                    y + height / 2,
+                    '筛选',
+                    Object.assign({}, { align: 'left', verticle: 'middle', fontSize: 12 })
+                );
+                currentTextWidth = calcTextWidth('筛选', '12px ' + sysFontFamily, this.canvas2DContext);
+
+                curBlockX = stackWidth;
+                curBlockY = y + height / 2 - 6;
+                curBlockWidth = currentTextWidth;
+                curBlockHeight = fontSize;
+                title_click_area.push({
+                    name: 'filter_' + this.uid + ':combineNodes:' + this.uid + ':' + `${curBlockX},${curBlockY},${curBlockWidth},${curBlockHeight}`,
+                    x: curBlockX,
+                    y: curBlockY,
+                    width: curBlockWidth,
+                    height: curBlockHeight
+                });
+                stackWidth = stackWidth + currentTextWidth + defaultMargin;
             }
 
             // 排序
@@ -1881,6 +1923,9 @@ class TimeSeriesLine {
                 });
                 stackWidth = stackWidth + currentTextWidth + defaultMargin;
             }
+
+            
+
             // 居中位置
             // 图标题
             text && text.show && fillText(
@@ -2148,16 +2193,17 @@ class TimeSeriesLine {
             }
             /********************* 第二层 ***************************/
             
-            // 筛选
+
+            // 节点查找
             if (this.title.filter && this.title.filter.show) {
                 fillText(
                     this.canvas2DContext,
                     node_x + padding_left,
                     y + text_padding_top + level1TextHeight + text_padding_top + fontSize / 2,
-                    '筛选',
+                    '查找',
                     Object.assign({}, { align: 'left', verticle: 'middle', fontSize: fontSize })
                 );
-                currentTextWidth = calcTextWidth('筛选', fontSize + 'px ' + sysFontFamily, this.canvas2DContext);
+                currentTextWidth = calcTextWidth('查找', fontSize + 'px ' + sysFontFamily, this.canvas2DContext);
 
                 curBlockX = node_x + padding_left;
                 curBlockY = y + text_padding_top + level1TextHeight + text_padding_top;
@@ -2172,6 +2218,33 @@ class TimeSeriesLine {
                 });
                 stackWidth = node_x + padding_left + currentTextWidth + defaultMargin;
             }
+
+            // 筛选
+            if (this.title.nodeFind && this.title.nodeFind.show) {
+                fillText(
+                    this.canvas2DContext,
+                    stackWidth, 
+                    y + height / 2,
+                    '筛选',
+                    Object.assign({}, { align: 'left', verticle: 'middle', fontSize: 12 })
+                );
+                currentTextWidth = calcTextWidth('筛选', '12px ' + sysFontFamily, this.canvas2DContext);
+
+                curBlockX = stackWidth;
+                curBlockY = y + height / 2 - 6;
+                curBlockWidth = currentTextWidth;
+                curBlockHeight = fontSize;
+                title_click_area.push({
+                    name: 'filter_' + this.uid + ':combineNodes:' + this.uid + ':' + `${curBlockX},${curBlockY},${curBlockWidth},${curBlockHeight}`,
+                    x: curBlockX,
+                    y: curBlockY,
+                    width: curBlockWidth,
+                    height: curBlockHeight
+                });
+             
+                stackWidth = stackWidth + currentTextWidth + defaultMargin;
+            }
+
             // 排序
             if (this.title.sort && this.title.sort.show) {
                 fillText(
@@ -2297,34 +2370,28 @@ class TimeSeriesLine {
     // this.nodes
     // this.nodeSlider
     renderNodeSlider (nodes) {
-        var renderNodes = nodes || this.nodes;
-        var _canvasContext = this.canvas2DContext,
-            layer_nodeSlider = this.layout.nodeSlider,
-            _x = layer_nodeSlider.x,
-            _y = layer_nodeSlider.y,
-            _width = layer_nodeSlider.width,
-            _height = layer_nodeSlider.height,
-            _direction = this.direction,
+        var layer_nodeSlider = this.layout.nodeSlider,
+            x = Math.round(layer_nodeSlider.x),
+            y = Math.round(layer_nodeSlider.y),
+            width = Math.round(layer_nodeSlider.width),
+            height = Math.round(layer_nodeSlider.height),
             _nodeSlider = this.nodeSlider,
             _filterValueRange = this.renderNodeFilterValueRange,    // 筛选后的节点值范围, 没配置时默认以 cellWidth去计算索引位置""
             _renderNodeValueRange = this.renderNodeValueRange,      // 筛选后的节点值范围, 没配置时默认以 cellWidth去计算索引位置
-            linearIndexWithPercent = linear([0, 100], _renderNodeValueRange);
+            linearIndexWithPercent = this.linearIndexWithPercent;
 
         // 一个滑块的全部配置;
-        var {show, position, sliderHeight, outer, inner, slider, resizerStyle} = _nodeSlider;
-        var show = _nodeSlider.show,
-            position = _nodeSlider.position || this.direction === 'horizontal' ? 'end' : 'inside',  // 节点起点位置 start, inside 节点与线条交汇处, end 线条末端
-            sliderHeight = _nodeSlider.sliderHeight || 10,
-            outer = _nodeSlider.outer || { background: 'rgba(255,255,255,0.3)', stroke: 'rgba(0,0,0,0.2)' },
-            inner = _nodeSlider.inner || { background: 'rgba(0,0,0,0.3)' },
-            resizerStyle = _nodeSlider.resizerStyle || { width: 4, height: 6, color: 'rgba(0,0,0,0)', position: 'center'},
-            boundaryText = _nodeSlider.boundaryText || { show: false },
+        var {show, sliderHeight, outer, inner, resizerStyle} = _nodeSlider;
+        var sliderHeight = _nodeSlider.sliderHeight,
+            outer = _nodeSlider.outer,
+            inner = _nodeSlider.inner,
+            resizerStyle = _nodeSlider.resizerStyle,
+            boundaryText = _nodeSlider.boundaryText,
             startValue = linearIndexWithPercent.setY(_filterValueRange[0]),
             endValue = linearIndexWithPercent.setY(_filterValueRange[1]),
             min = _renderNodeValueRange[0],
             max = _renderNodeValueRange[1],
-            direction = this.direction === 'horizontal' ? 'vertical' : 'horizontal',
-            x, y, width, height; 
+            direction = this.direction === 'horizontal' ? 'vertical' : 'horizontal'; 
 
         if (!_nodeSlider.show) {
             return
@@ -2332,7 +2399,10 @@ class TimeSeriesLine {
 
         this.erase(layer_nodeSlider);
         var dataZoomOption = {
-            ...layer_nodeSlider,
+            x,
+            y,
+            width,
+            height,
             direction,
             sliderHeight,
             outer,
@@ -2358,18 +2428,18 @@ class TimeSeriesLine {
     updateRenderNodes = (desc, param) => {
         if (this.animation.updateRenderNodes) { cancelAnimationFrame(this.animation.updateRenderNodes) }
         this.animation.updateRenderNodes = requestAnimationFrame(()=>{
-            var {value} = param;
+            var {percent} = param;
             // this.erase();
-            // this.createGrid();
             // this.renderGrid();
             // this.renderNodeSlider();
             var {node, grid} = this.layout;
+            var scale = this.linearIndexWithPercent.setX;
             this.erase(node);
             this.erase(grid);
             this.filterNodeAndLinksByLegend();
             this.createNodeSliders({
                 fieldKey: 'index',
-                range: [Math.floor(value[0]), Math.ceil(value[1])]
+                range: [Math.floor(scale(percent[0])), Math.ceil(scale(percent[1]))]
             });
             this.createScaleNodes();
             this.renderGrid();
@@ -2482,7 +2552,7 @@ class TimeSeriesLine {
                             stackTextHeiht = ty - textHalfHeight;
                             renderCount++;
                             
-                            if (node[_fieldkey_sourceType] && !imageBeDrawed) {
+                            if (node[_fieldkey_sourceType]) {
                                 image = new Image();
                                 image.src = sourceType_icons[node[_fieldkey_sourceType]];
                                 _canvasContext.drawImage(
@@ -2492,7 +2562,8 @@ class TimeSeriesLine {
                                     _nodeTextStyle.padding.right - 6,
                                     textHalfHeight * 2 - 2
                                 );
-                                imageBeDrawed = true;
+                                // && !imageBeDrawed
+                                // imageBeDrawed = true;
                                 // _canvasContext.drawImage(image, 33, 71, 104, 124, 21, 20, 87, 104);
                             }
                         }
@@ -2838,7 +2909,6 @@ class TimeSeriesLine {
 
         var _canvasContext = this.canvas2DContext,
             _direction = this.direction,
-            _linkLineStyle = this.linkLineStyle,
             _linearScaleTimeWithTimestamp = this.linearScaleTimeWithTimestamp,
             _linearScaleNodesWithIndex = this.linearScaleNodesWithIndex,
             _nodeIndexCache = this.nodeIndexCache,
@@ -2881,17 +2951,17 @@ class TimeSeriesLine {
                         _canvasContext,
                         {x: x, y: pos_y1}, 
                         {x: x, y: isTargetBigger ? pos_y2 - item_polygon.size : pos_y2 + item_polygon.size},
-                        {color: item_line.color || _linkLineStyle.color || '#fff', lineWidth: item_line.lineWidth || link.lineWidth || 1},
+                        {color: item_line.color || '#fff', lineWidth: item_line.lineWidth || link.lineWidth || 1},
                         {
                             start: { 
                                 size: item_circle.size, 
-                                fill: item_circle.color || _linkLineStyle.color || '#fff', 
+                                fill: item_circle.color || '#fff', 
                                 stroke: item_circle.stroke, 
                                 shape: 'circle'
                             },
                             end: { 
                                 size: item_polygon.size, 
-                                fill: item_polygon.color || _linkLineStyle.color || '#fff', 
+                                fill: item_polygon.color || '#fff', 
                                 stroke: item_polygon.stroke || null, 
                                 shape: 'polygon', 
                                 shapeSides: item_polygon.shapeSides||3, 
@@ -2906,13 +2976,13 @@ class TimeSeriesLine {
                         {
                             start: { 
                                 size: item_circle.size, 
-                                fill: item_circle.color || _linkLineStyle.color || '#fff', 
+                                fill: item_circle.color || '#fff', 
                                 stroke: item_circle.stroke, 
                                 shape: 'circle'
                             },
                             end: { 
                                 size: item_polygon.size, 
-                                fill: item_polygon.color || _linkLineStyle.color || '#fff', 
+                                fill: item_polygon.color || '#fff', 
                                 stroke: item_polygon.stroke || null, 
                                 shape: 'polygon', 
                                 shapeSides: item_polygon.shapeSides||3, 
@@ -2961,17 +3031,17 @@ class TimeSeriesLine {
                         this.canvas2DContext,
                         {x: pos_x1, y: y}, 
                         {x: isTargetBigger ? pos_x2 - item_polygon.size : pos_x2 + item_polygon.size, y: y},
-                        {color: item_line.color || _linkLineStyle.color || '#fff', lineWidth: item_line.lineWidth || link.lineWidth || 1},
+                        {color: item_line.color || '#fff', lineWidth: item_line.lineWidth || link.lineWidth || 1},
                         {
                             start: { 
                                 size: item_circle.size, 
-                                fill: item_circle.color || _linkLineStyle.color || '#fff', 
+                                fill: item_circle.color || '#fff', 
                                 stroke: item_circle.stroke, 
                                 shape: 'circle'
                             },
                             end: { 
                                 size: item_polygon.size, 
-                                fill: item_polygon.color || _linkLineStyle.color || '#fff', 
+                                fill: item_polygon.color || '#fff', 
                                 stroke: item_polygon.stroke || null, 
                                 shape: 'polygon', 
                                 shapeSides: item_polygon.shapeSides||3, 
@@ -2986,13 +3056,13 @@ class TimeSeriesLine {
                         {
                             start: { 
                                 size: item_circle.size, 
-                                fill: item_circle.color || _linkLineStyle.color || '#fff', 
+                                fill: item_circle.color || '#fff', 
                                 stroke: item_circle.stroke, 
                                 shape: 'circle'
                             },
                             end: { 
                                 size: item_polygon.size, 
-                                fill: item_polygon.color || _linkLineStyle.color || '#fff', 
+                                fill: item_polygon.color || '#fff', 
                                 stroke: item_polygon.stroke || null, 
                                 shape: 'polygon', 
                                 shapeSides: item_polygon.shapeSides||3, 
@@ -3027,7 +3097,6 @@ class TimeSeriesLine {
         renderedShapes = null;
         _canvasContext = null;
         _direction = null;
-        _linkLineStyle = null;
         _linearScaleTimeWithTimestamp = null;
         _linearScaleNodesWithIndex = null;
         _nodeIndexCache = null;
@@ -3051,6 +3120,10 @@ class TimeSeriesLine {
     }
 
     setHover = (e, canvas) => {
+        // 如果图例绘制错误, 或无数据;
+        if (!this.status) {
+            return
+        }
         // 超出当前矩形块
         var point = {x: e.zrX, y: e.zrY};
         if (!isPointInBlock(point, this.layout.grid)) { 
@@ -3062,7 +3135,7 @@ class TimeSeriesLine {
         this.animation.setHover = requestAnimationFrame(
             ()=>{
                 if (this.tooltip && this.tooltip.show) {
-                    
+
                     var allNodes = this.findHover(e.zrX, e.zrY);
                     if (allNodes.length) {
                         var links = allNodes.map(saveIndex => {
@@ -3104,7 +3177,6 @@ class TimeSeriesLine {
                             this.renderLinks();
                         }
                     }
-                    
                 }
             }, 15); // 60fps
     }
@@ -3174,7 +3246,6 @@ class TimeSeriesLine {
                 _fieldkey_to = '__to',
                 _fieldkey_timestamp = '__timestamp',
                 _fieldKey_seriesName = '__seriesName',
-                _linkLineStyle = this.linkLineStyle,
                 _themeConfig = this.themeConfig,
                 scalePercent = this.linearScalePercentWidthValue.setX,
                 timeReader = this.timeReader || getDate,
@@ -3208,17 +3279,17 @@ class TimeSeriesLine {
                             this.canvas2DContext,
                             {x: x, y: pos_y1}, 
                             {x: x, y: isTargetBigger ? pos_y2 - item_polygon.size : pos_y2 + item_polygon.size},
-                            {color: item_line.color || _linkLineStyle.color || '#fff', lineWidth: item_line.lineWidth || link.lineWidth || 1},
+                            {color: item_line.color || '#fff', lineWidth: item_line.lineWidth || link.lineWidth || 1},
                             {
                                 start: { 
                                     size: item_circle.size, 
-                                    fill: item_circle.color || _linkLineStyle.color || '#fff', 
+                                    fill: item_circle.color || '#fff', 
                                     stroke: item_circle.stroke, 
                                     shape: 'circle'
                                 },
                                 end: { 
                                     size: item_polygon.size, 
-                                    fill: item_polygon.color || _linkLineStyle.color || '#fff', 
+                                    fill: item_polygon.color || '#fff', 
                                     stroke: item_polygon.stroke || null, 
                                     shape: 'polygon', 
                                     shapeSides: item_polygon.shapeSides||3, 
@@ -3231,17 +3302,17 @@ class TimeSeriesLine {
                             this.canvas2DContext,
                             {x: pos_y1, y: x}, 
                             {x: isTargetBigger ? pos_y2 - item_polygon.size : pos_y2 + item_polygon.size, y: x},
-                            {color: item_line.color || _linkLineStyle.color || '#fff', lineWidth: item_line.lineWidth || link.lineWidth || 1},
+                            {color: item_line.color || '#fff', lineWidth: item_line.lineWidth || link.lineWidth || 1},
                             {
                                 start: { 
                                     size: item_circle.size, 
-                                    fill: item_circle.color || _linkLineStyle.color || '#fff', 
+                                    fill: item_circle.color || '#fff', 
                                     stroke: item_circle.stroke, 
                                     shape: 'circle'
                                 },
                                 end: { 
                                     size: item_polygon.size, 
-                                    fill: item_polygon.color || _linkLineStyle.color || '#fff', 
+                                    fill: item_polygon.color || '#fff', 
                                     stroke: item_polygon.stroke || null, 
                                     shape: 'polygon', 
                                     shapeSides: item_polygon.shapeSides||3, 
@@ -3357,12 +3428,15 @@ class TimeSeriesLine {
                 this.erase(node);
                 this.erase(nodeSlider);
                 this.renderedLinkShape.length = 0;
+                this.status = 0;
                 this.errorHandler({
                     type: 'warn',
                     message: '无数据',
                     text: '无数据'
                 }, grid);
                 return;
+            } else {
+                this.status = 1;
             }
             this.filterNodeAndLinksByLegend();
             this.createNodeSliders();
@@ -3401,7 +3475,7 @@ class TimeSeriesLine {
         // 超出当前矩形块
         var point = {x: e.zrX, y: e.zrY};
         
-        if (isPointInBlock(point, this.grid)) {
+        if (isPointInBlock(point, this.layout.grid)) {
             if (this.animation.scrollHandler) { cancelAnimationFrame(this.animation.scrollHandler) };
             this.animation.scrollHandler = requestAnimationFrame(()=>{
                 // 如果鼠标是放置在某一个位置, 把该位置作为缩放的中心区域:
@@ -3497,13 +3571,15 @@ class TimeSeriesLine {
                         this.createRenderNodesAndLinks(true);
 
                         if (this.nodes.length === 0 && this.links.length === 0) {
-                            this.createGrid();
+                            this.status = 0;
                             this.errorHandler({
                                 type: 'warn',
                                 message: '无数据',
                                 text: '无数据'
                             });
                             return;
+                        } else {
+                            this.status = 1;
                         }
 
 
@@ -3512,7 +3588,6 @@ class TimeSeriesLine {
                         this.createNodeSliders();
                         this.createScaleNodes();
                         this.createScaleTimes();
-                        this.createGrid();
                         this.renderGrid();
 
                         // if (this.animation.renderNodes) { cancelAnimationFrame(this.animation.renderNodes) };
@@ -3739,6 +3814,10 @@ class TimeSeriesLine {
         if (this.eventRecord.indexOf(eventType) !== -1) {
             this.eventRecord.push(eventType);
         }
+    }
+
+    off () {
+
     }
 
     // 派发事件
