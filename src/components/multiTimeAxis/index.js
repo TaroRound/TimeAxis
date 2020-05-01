@@ -2,7 +2,7 @@ import { linear, typeOf, merge_recursive, calcTextWidth, getSysFont, getUUid, fo
 import fillRect from '../../shape/rect';
 import fillLine from "../../shape/line";
 import fillText from "../../shape/text";
-
+import {autoFixXTicks} from './help'
 /**
  * 绘制刻度尺方法; 对于一串规则排列的文本, 此方法大体上适用;
  *  目前这个文本是一个顺序的数值, 且根据数值等分计算, 并建立线性比例来纠正偏移量操作的; 这种做法有很大局限性就是仅仅支持数值的情况;
@@ -30,9 +30,7 @@ class MultiTimeAxis {
         min,
         max,
         interval,
-        timeReader,
-        timeScale,
-        tickStyle
+        text
     }, eventHandler, canvas) {
         this.uid = getUUid();
         this.canvas2dContext = canvas2dContext;
@@ -47,21 +45,22 @@ class MultiTimeAxis {
         this.background = background;
         this.backgroundOrigin = backgroundOrigin;
         this.timeunit = timeunit;
-        this.min = min;
-        this.max = max;
+        this.min = typeOf(min) === 'number' ? parseInt(min) : typeOf(min) === 'string' && /[-/]/.test(min) ? new Date(min) : min;
+        this.max = typeOf(max) === 'number' ? parseInt(max) : typeOf(max) === 'string' && /[-/]/.test(max) ? new Date(max) : max;
         this.interval = interval || 8;
-        this.timeReader = timeReader || getDate;
-        this.timeReaderToValue = timeScale || null;
-        this.tickStyle = merge_recursive({
-            normal: {
-                fontSize: 12,
-                color: '#666'
-            },
-            emphasis: {
-                fontSize: 12,
-                color: 'red'
+        this.text = merge_recursive({
+            formatter: null,
+            style: {
+                normal: {
+                    fontSize: 12,
+                    color: '#666'
+                },
+                emphasis: {
+                    fontSize: 12,
+                    color: 'red'
+                }
             }
-        }, tickStyle);
+        }, text);
 
         this.eventHandler = eventHandler || {};
         this.eventRecord = [];
@@ -87,85 +86,41 @@ class MultiTimeAxis {
 
 
     // 根据一个给定的时间区间, 返回一个"固定数量"的刻度尺文本
-    autoFixXTicks (startTime, endTime, interval) {
-        if (startTime && endTime) {
-            var _endTime = endTime;
-            if (_endTime < startTime) {
-                endTime = startTime;
-                startTime = _endTime;
+    autoFixXTicks (start, end, interval) {
+        if (start && end) {
+            var _end = end;
+            if (_end < start) {
+                end = start;
+                start = _end;
             }
         }
         var toTransFormatter = new Date('2018-01') == 'Invalid Date',
             ticks = [],
+            scaleK,
             startDateInstance,
             endDateInstance,
-            oneDayTimes = 86400000,
             timeReader;
 
-        if (typeOf(startTime) === 'number' || typeOf(startTime) === 'date') {
-            startDateInstance = this.timeReader(startTime);
-        } else if (typeOf(startTime) === 'string') {
-            startDateInstance = this.timeReader(toTransFormatter ? startTime.replace(/-/g, '/') : startTime )
-        }
-        if (typeOf(endTime) === 'number' || typeOf(endTime) === 'date') {
-            endDateInstance = this.timeReader(endTime);
-        } else if (typeOf(endTime) === 'string') {
-            endDateInstance = this.timeReader(toTransFormatter ? endTime.replace(/-/g, '/') : endTime )
-        }
+        if (typeOf(start) === 'number' && typeOf(end) === 'number') {
 
-        var returnSecond = function (t) { return formatDate(t, 'yyyy-MM-dd hh:mm:ss') };
-        var returnMinute = function (t) { return formatDate(t, 'yyyy-MM-dd hh:mm') };
-        var returnHour = function (t) { return formatDate(t, 'yyyy-MM-dd hh:00') };
-        var returnDay = function (t) { return formatDate(t, 'yyyy-MM-dd') };
-        var returnMonth = function (t) { return formatDate(t, 'yyyy-MM') };
-        var returnYear = function (t) { return formatDate(t, 'yyyy') };
-        var returnWeek = function (t) { return getDate(t).getFullYear() + '第 ' + getWeek(t) + '周' }
-        var timeFactory = scaleTime().domain([new Date(startDateInstance), new Date(endDateInstance)]);
+            timeReader = parseInt;
+            scaleK = linear([0, interval-1], [start, end]);
+            for(var i = 0; i < interval; i++) {
+                ticks.push(parseInt(scaleK.setX(i)));
+            }
+        } else if (typeOf(start) === 'string' && typeOf(end) === 'string') {
 
-        // console.log('借助于d3.scaleTime', [...timeFactory.ticks(interval)].map( returnDay ) , [...timeFactory.ticks(timeDay.every(5))].map( returnDay ));
+            startDateInstance = new Date(toTransFormatter ? start.replace(/-/g, '/') : start );
+            endDateInstance = new Date(toTransFormatter ? end.replace(/-/g, '/') : end );
+            scaleK = autoFixXTicks(startDateInstance, endDateInstance, interval);
 
-        var distance = endDateInstance - startDateInstance;
-        // 两小时之内: 返回秒
-        if (0 <= distance && distance <= oneDayTimes / 12) {
-            // returnSecond(startDateInstance), , returnSecond(endDateInstance)
-            ticks = [...timeFactory.ticks(interval)];
-            timeReader = returnSecond;
-        }
-        // 超过两小时, 小于六小时, 返回分
-        else if (oneDayTimes / 12 < distance && distance <= oneDayTimes / 2) {
-            // returnMinute(startDateInstance), , returnMinute(endDateInstance)
-            ticks = [...timeFactory.ticks(interval)];
-            timeReader = returnMinute;
-        }
-        // 大于六小时, 小于三天, 返回小时
-        else if (oneDayTimes / 2 < distance && distance <= oneDayTimes * 3) {
-            // returnHour(startDateInstance), , returnHour(endDateInstance)
-            ticks = [...timeFactory.ticks(interval)];
-            timeReader = returnHour;
-        }
-        // 大于三天, 小于30天, 返回天
-        else if (oneDayTimes * 3 < distance && distance <= oneDayTimes * 30) {
-            // returnDay(startDateInstance), , returnDay(endDateInstance)
-            ticks = [...timeFactory.ticks(interval)];
-            timeReader = returnDay;
-        }
-        // 大30天, 小于180天, 返回周
-        else if (oneDayTimes * 30 < distance && distance <= oneDayTimes * 180) {
-            // returnWeek(startDateInstance), , returnWeek(endDateInstance)
-            ticks = [...timeFactory.ticks(interval)];
-            timeReader = returnWeek;
-        }
-        // 大于180天, 小于5年, 返回月
-        else if (oneDayTimes * 180 < distance && distance <= oneDayTimes * 365 * 5) {
-            // returnMonth(startDateInstance), , returnMonth(endDateInstance)
-            ticks = [...timeFactory.ticks(interval)];
-            timeReader = returnMonth;
-        }
-        // 大于 5年, 返回年
-        else {
-            // returnYear(startDateInstance), , returnYear(endDateInstance)
-            ticks = [...timeFactory.ticks(interval)];
-            timeReader = returnYear;
+            ticks = scaleK.ticks;
+            timeReader = scaleK.timeReader;
+        } else if (typeOf(start) === 'date' && typeOf(end) === 'date') {
+            scaleK = autoFixXTicks(startDateInstance, endDateInstance, interval);
+
+            ticks = scaleK.ticks;
+            timeReader = scaleK.timeReader;
         }
 
         return {ticks, timeReader}
@@ -223,11 +178,12 @@ class MultiTimeAxis {
     drawChart () {
         // if (this.animation.render_chart) { cancelAnimationFrame(this.animation.render_chart) };
         // this.animation.render_chart = requestAnimationFrame(() => {
-            var {ticks, timeReader} = this.autoFixXTicks(parseInt(this.min), parseInt(this.max), this.interval),
-                timeReaderToValue = this.timeReaderToValue,
+            var {ticks, timeReader} = this.autoFixXTicks(this.min, this.max, this.interval),
                 _registerBlocks = this.registerBlocks,
-                textStyle = this.tickStyle.normal,
+                textStyle = this.text.style.normal,
+                textFormatter = typeOf(this.text.formatter) === 'function' ? this.text.formatter : timeReader,
                 scaleK;
+            
             _registerBlocks.length = 0;
             if (this.direction === 'horizontal') {
                 scaleK = linear(
@@ -237,11 +193,12 @@ class MultiTimeAxis {
                                 this.x + this.leftPadding + this.boundary[0] + this.width - this.leftPadding - this.rightPadding - this.boundary[0] - this.boundary[1]
                             ]
                         );
-                var oneTickWidth = calcTextWidth(timeReader(ticks[0]), textStyle.fontSize + 'px ' + getSysFont(''), this.canvas2dContext);
+                var oneTickWidth = calcTextWidth(textFormatter(ticks[0]), textStyle.fontSize + 'px ' + getSysFont(''), this.canvas2dContext);
+                var isDate = typeOf(ticks[0]) === 'date';
                 var stackWidth = this.x;
                 ticks.map((date, i) => {
-                    var _x = typeOf(timeReaderToValue) === 'function' ? scaleK.setX(timeReaderToValue(date)) : scaleK.setX(date.getTime());
-                    
+                    var _x = scaleK.setX(isDate ? date.getTime() : date);
+
                     fillLine(
                         this.canvas2dContext,
                         {x: _x, y: this.y },
@@ -256,7 +213,7 @@ class MultiTimeAxis {
                             this.canvas2dContext,
                             _x,
                             this.y + 8,
-                            timeReader(date),
+                            textFormatter(date),
                             {
                                 color: textStyle.color,
                                 fontSize: textStyle.fontSize,
@@ -270,7 +227,7 @@ class MultiTimeAxis {
                             y: this.y + 8,
                             width: oneTickWidth,
                             height: textStyle.fontSize,
-                            text: timeReader(date),
+                            text: textFormatter(date),
                             select: false
                         });
                     }
@@ -284,11 +241,11 @@ class MultiTimeAxis {
                     ]
                 );
                 var time1 = Date.now();
-                var oneTickWidth = calcTextWidth(timeReader(ticks[0]), textStyle.fontSize + 'px ' + getSysFont(''), this.canvas2dContext);
-                
+                var oneTickWidth = calcTextWidth(textFormatter(ticks[0]), textStyle.fontSize + 'px ' + getSysFont(''), this.canvas2dContext);
+                var isDate = typeOf(ticks[0]) === 'date';
 
                 ticks.map((date, i) => {
-                    var _y = typeOf(timeReaderToValue) === 'function' ? scaleK.setX(timeReaderToValue(date)) : scaleK.setX(date.getTime());
+                    var _y = scaleK.setX(isDate ? date.getTime() : date);
                     fillLine(
                         this.canvas2dContext,
                         {x: this.x, y: _y },
@@ -303,7 +260,7 @@ class MultiTimeAxis {
                 this.canvas2dContext.save();
                 var last = {x: 0, y: 0};
                 ticks.map((date, i) => {
-                    var _y = typeOf(timeReaderToValue) === 'function' ? scaleK.setX(timeReaderToValue(date)) : scaleK.setX(date.getTime());
+                    var _y = scaleK.setX(isDate ? date.getTime() : date);
 
                     var curPos = {
                         x: this.x + 8,
@@ -320,7 +277,7 @@ class MultiTimeAxis {
                         // _y,
                         0,
                         0,
-                        timeReader(date),
+                        textFormatter(date),
                         {
                             color: textStyle.color,
                             fontSize: textStyle.fontSize,
@@ -340,7 +297,7 @@ class MultiTimeAxis {
                         y: curPos.y - oneTickWidth/2,
                         width: textStyle.fontSize,
                         height: oneTickWidth,
-                        text: timeReader(date),
+                        text: textFormatter(date),
                         select: false
                     });
                 });

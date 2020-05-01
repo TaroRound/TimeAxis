@@ -8,6 +8,66 @@
 import TimeAxis from '../../../dist/index.js';
 import {formatDate} from '../../../src/lib/util/index'
 
+
+function generateData (nodeLen, linkLen) {
+  var nodes = [];
+  var links = [];
+  var offset = 360;
+  var oneday = 86400000;
+
+  var char = 'abcdefghijklmnopqrstuvwxyz';
+  var nodeId = null;
+  for (var i = 0; i < nodeLen; i++) {
+    nodeId = char[(Math.random() * char.length) | 0] + Math.floor(Math.random() * 7303 * 2401);
+    nodes.push({
+      nodeId: nodeId,
+      text: char[(Math.random() * char.length) | 0] + Math.floor(Math.random() * 7303 * 2401)
+    })
+  }
+
+  var time = null,
+      from = null,
+      to = null;
+  for (var k = 0; k < linkLen; k++) {
+    time = formatDate(new Date(new Date().getTime() - (offset * oneday * Math.random() ^ 0)), 'yyyy-MM-dd hh:');
+    // time = Math.random() * 1000000000;
+    from = nodes[(Math.random() * nodeLen ^ 0)].nodeId;
+    to = nodes[(Math.random() * nodeLen ^ 0)].nodeId;
+    links.push({
+      from: from,
+      to: to,
+      timestamp: time
+    })
+  }
+
+  return {
+    nodes: nodes,
+    links: links
+  }
+}
+
+var series1 = generateData(80, 300);
+var series2 = generateData(80, 200);
+
+const SYS_DB_TIMEDATE_READER = function (v) {
+    if (v == undefined || v === '') { // || v == 0
+        return undefined
+    } else {
+
+        var pa = /^-?[\d.]+$/,
+            sv, vc;
+        // 10位时间戳, 13位时间戳, 甚至是带小数的时间戳
+        if (pa.test(v)) {
+            sv = v + '';
+            vc = sv.match(/^-?(\d+)/)[1];
+            return formatDate(new Date(vc.length <= 11 ? parseInt(sv * 1000) : v), 'yyyy-MM-dd hh:mm:ss');
+        } 
+        // '2017-01-01 00:00:00'
+        else {
+            return formatDate(new Date(new Date(v).getTime()), 'yyyy-MM-dd hh:mm:ss');
+        }
+    }
+}
 export default {
   name: 'HelloWorld',
   data () {
@@ -27,41 +87,31 @@ export default {
     var timeAxisInstance = new TimeAxis('#timeAxis', {
       background: '#fff',
       safePerformance: Infinity,
+      axis: {
+        text: {
+          formatter: SYS_DB_TIMEDATE_READER
+        }
+      },
+      dataZoom: {
+        boundaryText: {
+          formatter: SYS_DB_TIMEDATE_READER
+        }
+      },
       series: [
         {
           name: '示例1',
+          groupId: '示例1',
           title: {
             show: true
           },
-          data: {
-            nodes: [
-              {nodeId: 111, text: '一号'},
-              {nodeId: 222, text: '二号'},
-              {nodeId: 333, text: '三号'}
-            ],
-            links: [
-              {from: 111, to: 333, timestamp: '2019-01-02'},
-              {from: 111, to: 222, timestamp: '2019-01-04'},
-              {from: 222, to: 333, timestamp: '2019-01-05'}
-            ]
-          }
+          data: series1
         }, {
           name: '示例2',
+          groupId: '示例2',
           title: {
             show: true
           },
-          data: {
-            nodes: [
-              {nodeId: 111, text: '一号'},
-              {nodeId: 222, text: '二号'},
-              {nodeId: 333, text: '三号'}
-            ],
-            links: [
-              {from: 111, to: 333, timestamp: '2019-01-02'},
-              {from: 111, to: 222, timestamp: '2019-01-04'},
-              {from: 222, to: 333, timestamp: '2019-01-05'}
-            ]
-          }
+          data: series2
         }
       ],
       nodePadding: {right: 15},
@@ -84,14 +134,14 @@ export default {
       timeAxisInstance.dispatchAction({
         type: 'dataZoom',
         start: 30,
-        groupId: '组2',
+        groupId: '示例1',
         end: 40
       });
 
       timeAxisInstance.dispatchAction({
         type: 'legendSelect',
         data: {
-          groupId: '组2',
+          groupId: '示例1',
           name: ['QZ', 'HY']
         }
       });
@@ -99,11 +149,11 @@ export default {
       timeAxisInstance.dispatchAction({
         type: 'legendUnSelect',
         data: {
-          groupId: '组1',
+          groupId: '示例2',
           name: ['HD']
         }
       });
-    }, 1000);
+    }, 3000);
   }
 }
 </script>

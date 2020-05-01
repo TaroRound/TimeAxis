@@ -123,7 +123,6 @@ class TimeSeriesLine {
         splitLine,      // 网格线样式设置
         nodeTextStyle,
         timeunit,       // 辅助设置时间起止点
-        timeReader,     // 读取时间值函数, 默认为 new Date
         maxAxisTextWidthOrHeight,  // 预定义节点文本最大占宽: 如果没传递会从渲染的节点中找到最长的文本, 计算最长文本所占的宽, 如果有多个图时占宽是不一样的, 这个属性有利于多图形时排版的统一;
         chartId,        // 外部分配的一个图形 ID, 多图形时有利于访问到正确的图形实例
         minCellWidth,   // 控制节点展示数量辅助配置. 可能是直接的数值(如: 10), 也可能是控制间距(如 40px), 这里暂时实现的是根据间距, 去计算值 
@@ -137,7 +136,6 @@ class TimeSeriesLine {
         fieldkey_nodeText,
         fieldkey_timestamp,
         fieldkey_sourcetype,
-        timestampIsString,
         tooltip,        // 提升文字的配置: 可能是属性悬停/点击 轴线/图形展示相对应的文字信息. 这里暂时只实现图形的悬停提升; 
         saferange,      // 暂未实现的功能: 把图形展示数量控制在一个安全的范围之内
         nodeSlider,
@@ -201,8 +199,6 @@ class TimeSeriesLine {
         this.minCellWidth = nodeSlider && nodeSlider.show ? minCellWidth || 1 : minCellWidth || 0;  // 节点数量较大时, 是否使用最小间距的配置
         this.titleHeight = titleHeight || 0; // 40; // 标题的高度
         this.timeunit = timeunit || 'year'; // 时间粒度; 暂无实现的功能; 该功能需要对数据依据年, 季度, 月份等和节点 id对数据进行统计分类; 然后绘制分类后的数据;
-        this.timeReader = timeReader;   // 可选的配置, 比如如果连线的数据是日期格式字符串, 只想要以年份作为时间线来显示, 就需要设置 timeReader
-        this.timestampIsString = timestampIsString;     // 时间戳是否为字符串
         this.fieldkey_links = fieldkey_links || 'links';
         this.fieldkey_nodes = fieldkey_nodes || 'nodes';
         this.fieldkey_nodeId = fieldkey_nodeId || 'nodeId';
@@ -402,9 +398,11 @@ class TimeSeriesLine {
         if (this.animation.render_chart) { cancelAnimationFrame(this.animation.render_chart) };
         this.animation.render_chart = requestAnimationFrame(() => {
             
+            this.calcDataFormatter();
+
             // 根据设置的百分比, 设定值的区间
             this.initTimeRange();
-            this.calcDataFormatter();
+            
             // 根据设定的值的区间, 筛选出值区间内的节点, 线条; 并且建立起值区间内值的缓存
             this.createRenderNodesAndLinks();
 
@@ -524,11 +522,13 @@ class TimeSeriesLine {
                 this.optionsList = layers;
                 this.saferange = this.endPercent - this.startPercent;
 
+                this.calcDataFormatter();
+
                 // 重设置;
                 // this.erase();
                 // 根据设置的百分比, 设定值的区间
                 this.initTimeRange();
-                this.calcDataFormatter();
+                
                 // 根据设定的值的区间, 筛选出值区间内的节点, 线条; 并且建立起值区间内值的缓存
                 this.createRenderNodesAndLinks();
                 
@@ -943,7 +943,7 @@ class TimeSeriesLine {
 
             // 如果传入的这个值是 2019, 2019-08, 2019-08-02, 1300131300, 130013001300, 2019-08-02 12:00:00 等等众多种情况;
             // 带 -/ 时, 可以认为它是时间格式的一种, 需要处理一下这种情况便于 筛选值;
-            if (instance && /[/:-].test(instance)/) {
+            if (instance && /[/:-]/.test(instance)) {
                 var matter = {0:'yyyy', 1: 'MM', 2: 'dd', 3: 'hh', 4: 'mm', 5: 'ss'};
                 var i = 0;
                 instance = instance.replace(/\d+/g, function (match, $1, index, str) {
@@ -951,6 +951,8 @@ class TimeSeriesLine {
                     i++;
                     return match.length > 2 ? 'yyyy' : tr;
                 });
+            } else {
+                instance = null;
             }
         }
         this.timestampInstance = instance
@@ -1103,8 +1105,8 @@ class TimeSeriesLine {
     initTimeRange () {
         var start = this.linearScalePercentWidthValue.setX(this.startPercent);
         var end = this.linearScalePercentWidthValue.setX(this.endPercent);
-        var startDate = this.timestampIsString ? this.timeReader(start) : start,
-            endDate = this.timestampIsString ? this.timeReader(end) : end;
+        var startDate = this.timestampInstance ? formatDate(start, this.timestampInstance || 'yyyy-MM-dd hh:mm:ss') : start,
+            endDate = this.timestampInstance ? formatDate(end, this.timestampInstance || 'yyyy-MM-dd hh:mm:ss') : end;
 
         this.startTime = startDate;
         this.endTime = endDate;
@@ -1117,8 +1119,8 @@ class TimeSeriesLine {
     createRenderNodesAndLinks (fromCache) {        
         // 筛选条件
         var {startTime, endTime} = this;
-        var startTimeDateString = this.timestampIsString ? formatDate(startTime, this.timestampInstance || 'yyyy-MM-dd hh:mm:ss') : startTime;
-        var endTimeDateString = this.timestampIsString ? formatDate(endTime, this.timestampInstance || 'yyyy-MM-dd hh:mm:ss') : endTime;
+        var startTimeDateString = this.timestampInstance ? formatDate(startTime, this.timestampInstance || 'yyyy-MM-dd hh:mm:ss') : startTime;
+        var endTimeDateString = this.timestampInstance ? formatDate(endTime, this.timestampInstance || 'yyyy-MM-dd hh:mm:ss') : endTime;
 
         // 待绘制的节点, 线条数据, 以及节点对应索引位置的必要缓存信息
         var links = [];
@@ -1155,7 +1157,7 @@ class TimeSeriesLine {
                 }
             }
         } else {
-            var {fieldkey_links, fieldkey_nodes, fieldkey_from, fieldkey_to, fieldkey_timestamp, fieldkey_nodeId, fieldkey_nodeText, fieldkey_sourcetype, timeReader} = this;
+            var {fieldkey_links, fieldkey_nodes, fieldkey_from, fieldkey_to, fieldkey_timestamp, fieldkey_nodeId, fieldkey_nodeText, fieldkey_sourcetype} = this;
             var allLinks = [];
             var allNodes = {};
             var idCache = {};
@@ -1175,7 +1177,6 @@ class TimeSeriesLine {
                 fieldkey_nodeId = opt.fieldkey_nodeId || fieldkey_nodeId;
                 fieldkey_nodeText = opt.fieldkey_nodeText || fieldkey_nodeText;
                 fieldkey_sourcetype = opt.fieldkey_sourcetype || fieldkey_sourcetype;
-                timeReader = opt.timeReader || timeReader;
 
                 var defaultColor = opt.color || getColor();
                 var defaultItemStyle = deepCopy(this.itemStyle);
@@ -2494,6 +2495,7 @@ class TimeSeriesLine {
         // this.nodes
         // 横向: 从上到下的绘图顺序
         if (_direction === 'horizontal') {
+            
             if (_nodeTextStyle.background) {
                 fillRect(
                     _canvasContext,
@@ -2901,7 +2903,7 @@ class TimeSeriesLine {
 
     renderLinks () {
         var t1 = Date.now();
-        var timeReader = this.timeReader || getDate;
+        var timeReader = this.timestampInstance ? v => getDate(v).getTime() : v => +v;
         var renderLinks = this.renderLinkTask;
         var scalePercent = this.linearScalePercentWidthValue.setX;
         var renderedShapes = this.renderedLinkShape;
@@ -2916,7 +2918,7 @@ class TimeSeriesLine {
             _fieldkey_to = '__to', // '__to' this.fieldkey_to,
             _fieldkey_timestamp = '__timestamp', // '__timestamp' this.fieldkey_timestamp,
             _fieldKey_seriesName = '__seriesName',
-            _dateIsString = this.timestampIsString,
+            _dateIsString = this.timestampInstance,
             _itemStyle = this.itemStyle,
             _themeConfig = this.themeConfig,
             renderFn;
@@ -3148,7 +3150,8 @@ class TimeSeriesLine {
                             this.setHighLight(links);
                         }
                         var txt = '';
-                        var getDate = this.timeReader;
+                        var getDate = this.timestampInstance ? v => formatDate(v, this.timestampInstance || 'yyyy-MM-dd hh:mm:ss') : v => v;;
+                        
                         var nodeIdWithTextCache = this.nodeIdWithTextCache;
                         if (typeof this.tooltip.formatter === 'function') {
                             // 链接线: links 信息, nodeId: 对应的文本信息: nodeIdWithTextCache 缓存对象
@@ -3159,7 +3162,7 @@ class TimeSeriesLine {
                                     return `<div style="margin-bottom:${index===links.length-1?0:5}px;">
                                                 <p class="timeAxis-tooltip-text">文本: ${nodeIdWithTextCache[link.__from]} -> ${nodeIdWithTextCache[link.__to]}</p>
                                                 <p class="timeAxis-tooltip-text">节点id: ${link.__from} -> ${link.__to}</p>
-                                                <p class="timeAxis-tooltip-text">时间: ${formatDate(getDate(link.__timestamp), 'yyyy-MM-dd hh:mm:ss')}</p>
+                                                <p class="timeAxis-tooltip-text">时间: ${getDate(link.__timestamp)}</p>
                                             </div>`
                                 }).join('');
                                 txt = `<style>.timeAxis-tooltip-text{margin:0;padding:0;}</style>${txt}`
@@ -3248,13 +3251,13 @@ class TimeSeriesLine {
                 _fieldKey_seriesName = '__seriesName',
                 _themeConfig = this.themeConfig,
                 scalePercent = this.linearScalePercentWidthValue.setX,
-                timeReader = this.timeReader || getDate,
+                timeReader = this.timestampInstance ? v => getDate(v).getTime() : v => +v,
                 _nodeIndexCache = this.nodeIndexCache,
                 _linearScaleTimeWithTimestamp = this.linearScaleTimeWithTimestamp,
                 _linearScaleNodesWithIndex = this.linearScaleNodesWithIndex;
 
             // 如果值有问题导致异常, 那么默认归位到 0
-            if (this.timestampIsString) {
+            if (this.timestampInstance) {
                 x = _linearScaleTimeWithTimestamp.setX(timeReader(link[_fieldkey_timestamp]) || scalePercent(0));
             } else {
                 x = _linearScaleTimeWithTimestamp.setX(link[_fieldkey_timestamp] || scalePercent(0) );
@@ -3680,7 +3683,7 @@ class TimeSeriesLine {
         var expandRadius = 5;
         var inArea = [];
         var basePos = 0;
-        var getDate = (v) => this.timestampIsString ? this.timeReader(v) : v;
+        var getDate = this.timestampInstance ? v => formatDate(v, this.timestampInstance || 'yyyy-MM-dd hh:mm:ss') : v => v;
         
 
         if (this.direction === 'horizontal') {

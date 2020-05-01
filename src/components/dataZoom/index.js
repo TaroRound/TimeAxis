@@ -356,7 +356,7 @@ class dataZoom {
             min = this.min,
             max = this.max,
             data = fromCache ? this._dataViewData : [],
-            first = getFirst(dataView),
+            first = getFirst(dataView) + '',
             beginIndex = 0,
             result,
             renderCurbe;
@@ -392,16 +392,17 @@ class dataZoom {
             if (typeof first === 'string') {
 
                 // 几十万的大数组排序操作, 这会是性能耗费大户, 但为了后续取值的方便, 这一步是应该做的;
-                dataView.sort((n1, n2) => { return n1 > n2 ? -1 : 1 });
-
+                dataView.sort((n1, n2) => { return n1 > n2 ? 1 : -1 });
+                
                 if (dataView.length < toCale) {
                     for (var i = 0, dataLen = dataView.length, date; i < dataLen; i++) {
                         curVal = dataView[i];
                         maxVal = dataView[i+1 >= dataLen ? dataLen - 1 : i + 1];
 
                         if (date = getDate(curVal)) {
+                            
                             data.push({
-                                x: date,
+                                x: scalek.setY(date.getTime()),
                                 value: 1
                             });
                         }
@@ -411,7 +412,7 @@ class dataZoom {
                     for (var i = 0; i < toCale; i++) {
                         curVal = formatDate(scalek.setX(i), timeTpl);
                         maxVal = formatDate(scalek.setX(i + 1), timeTpl);
-
+                        
                         result = totalCountInAscArrByRange(dataView, [curVal, maxVal], beginIndex);
                         beginIndex = result.index[1];
                         data.push(result.value);
@@ -422,7 +423,7 @@ class dataZoom {
             } else {
 
                 // 几十万的大数组排序操作, 这会是性能耗费大户, 但为了后续取值的方便, 这一步是应该做的;
-                dataView.sort((n1, n2) => { return n1 > n2 ? -1 : 1 });
+                dataView.sort((n1, n2) => { return n1 > n2 ? 1 : -1 });
 
                 if (dataView.length < toCale) {
                     for (var i = 0, dataLen = dataView.length, date; i < dataLen; i++) {
@@ -457,6 +458,7 @@ class dataZoom {
         // var totel = data.reduce((preReturn, next) => preReturn + next, 0);
         if (data.length) {
             var extremum = getExtremum(data);
+            
             var lineArea,
                 _min = extremum.min,
                 _max = extremum.max,
@@ -495,7 +497,7 @@ class dataZoom {
             lineArea.addPoint(x + width, y + height);
 
             if (renderCurbe) {
-                lineArea.createCurvePath(this.canvas2dContext);
+                // lineArea.createCurvePath(this.canvas2dContext);
             }
             if (lineArea) {
                 lineArea.fill(this.canvas2dContext);

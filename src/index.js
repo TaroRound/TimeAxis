@@ -1,5 +1,4 @@
 import { getUUid, typeOf, deepEqual, deepCopy, formatDate, type, getDate, linear, merge_recursive, noevent, calcBreakWord, getSysFont } from './lib/util/index';
-import {SYS_DB_TIMEDATE_READER} from './config/index'
 import Chart from './components/chart/index';
 import TimeSeriesLine from './components/timeSeriesLine/index';
 import DataZoom from './components/dataZoom/index';
@@ -185,7 +184,8 @@ class TimeStaticChart extends Chart {
         fieldkey_links,
         fieldkey_nodes,
         fieldkey_groupId,
-        safePerformance
+        safePerformance,
+
     }) {
         super(selector, { mode, leftPadding, topPadding, rightPadding, bottomPadding, tooltip: tooltip });
 
@@ -663,7 +663,6 @@ class TimeStaticChart extends Chart {
             var leftPadding = this.direction === 'horizontal' ? tickRenderStart + offset.left : tickRenderStart + titleHeight + offset.top;
             var rightPadding = this.direction === 'horizontal' ? offset.right : offset.bottom;
             var scaleK = linear([0, 100], [min, max]);
-            var timestampIsString = this.dataZoom.timestampIsString;
             var setting = {
                 direction: this.direction,
                 x: boxModer.x,
@@ -679,8 +678,7 @@ class TimeStaticChart extends Chart {
                 min: scaleK.setX(startValue),
                 max: scaleK.setX(endValue),
                 interval: 8,
-                timeReader: SYS_DB_TIMEDATE_READER,
-                timeScale: (time) => { var date = new Date(time); return timestampIsString ? date.getTime() : date.getTime() / 1000 }
+                text: this.axis.text
             };
             if (this.timeTickInstance) {
                 this.timeTickInstance.update(setting);
@@ -751,7 +749,6 @@ class TimeStaticChart extends Chart {
                         min: min,
                         max: max,
                         reverse: axisIndex === -1 ? false : i < axisIndex,   // 绘图顺序: 从上到下, 从左到右;
-                        timeReader: SYS_DB_TIMEDATE_READER,
                         chartId: layout.groupId,
                         maxAxisTextWidthOrHeight: tickRenderStart,
                         titleHeight: titleHeight,
@@ -763,7 +760,6 @@ class TimeStaticChart extends Chart {
                         fieldkey_timestamp,
                         fieldkey_nodeText,
                         fieldkey_sourcetype: fieldKey_nodeSourcetype,
-                        timestampIsString: this.dataZoom.timestampIsString,
                         tooltip: this.tooltip,
                         nodeSlider: nodeSlider,
                         itemStyle: itemStyle
@@ -824,7 +820,6 @@ class TimeStaticChart extends Chart {
         var safeMaxCount = this.safePerformance || 100;     // 图例要展示的大概数量
         var fieldkey_links = this.fieldkey_links;
         var fieldkey_timestamp = this.fieldkey_timestamp;
-        var timestampIsString = false;
         var dataView = [];
         var ct1 = Date.now();
         this.series && this.series.forEach(chart => {
@@ -858,9 +853,8 @@ class TimeStaticChart extends Chart {
 
         // 在超大数据量时候, 为了避免要生成大量的 Date对象, 只在值为字符串时, 才做出时间转换: 因为要生成线性比例尺, 字符串无法生成
         if (typeOf(_max) === 'string') {
-            _min = SYS_DB_TIMEDATE_READER(_min).getTime();
-            _max = SYS_DB_TIMEDATE_READER(_max).getTime();
-            timestampIsString = true;
+            _min = new Date(_min).getTime();
+            _max = new Date(_max).getTime();
         } else if (typeOf(_max) === 'number') {
             // 为了兼容到 2019, 秒计数, 毫秒计数 等这些不定规格的数字格式, 且考虑到大量数据时的情况, 放弃转化为统一的 毫秒计数
         }
@@ -895,7 +889,6 @@ class TimeStaticChart extends Chart {
         // this.dataZoom.resizeToMaxAble = false;
         this.dataZoom.max = _max;
         this.dataZoom.min = _min;
-        this.dataZoom.timestampIsString = timestampIsString;
         this.dataZoom.totalMaxCount = totalMaxCount;
         this.dataZoom.dataViewData = dataView;
         // 同时为操作值初始化
@@ -963,7 +956,7 @@ class TimeStaticChart extends Chart {
             var resizerStyle = this.dataZoom.resizerStyle;
             var dataView = this.dataZoom.dataView;
             var sliderPos = this.nodeSlider && this.nodeSlider.position;
-            var nodeSliderHeight = this.nodeSlider && this.nodeSlider.sliderHeight || 0;
+            var nodeSliderHeight = this.nodeSlider && this.nodeSlider.sliderHeight || 10;
             var hasSlider = this.nodeSlider && !!this.nodeSlider.show;
             if (!hasSlider) {
                 hasSlider = minCellWidth > 0;
@@ -983,6 +976,7 @@ class TimeStaticChart extends Chart {
             }
             var leftPadding = 0;
             var rightPadding = 0;
+
             if (this.direction === 'horizontal') {
                 leftPadding = padding.left + tickRenderStart + offset.left + (hasSlider && sliderPos !== 'end' ? nodeSliderHeight : 0 );
                 rightPadding = offset.right + (hasSlider && sliderPos === 'end' ? nodeSliderHeight : 0 ) + padding.right;
@@ -1015,9 +1009,6 @@ class TimeStaticChart extends Chart {
                 }, resizerStyle),
                 boundaryText: Object.assign({
                     show: true,
-                    formatter: function (v) {
-                        return formatDate(SYS_DB_TIMEDATE_READER(v), 'yyyy-MM-dd hh:mm:ss')
-                    },
                     textStyle: {
                         color: '4c4c4c'
                     }
@@ -1607,7 +1598,6 @@ class TimeStaticChart extends Chart {
                 if (eventDesc.groupId) {
                     var newFunc = new Function(['context', 'eventDesc'], `
                         for(var i=0; i< context.chartInstance.length; i++) {
-
                             if(context.chartInstance[i].uid === eventDesc.groupId) {
 
                                     if (context.chartInstance[i].dataZoomInstance) {
@@ -1641,23 +1631,23 @@ class TimeStaticChart extends Chart {
                     var groupId = eventDesc.data.groupId,
                         name = eventDesc.data.name;
                     if (groupId && name) {
-                        var newFunc = new Function(['context', 'eventDesc'], `
-                            for(var i=0; i< context.chartInstance.length; i++) {
+                        // var newFunc = new Function(['context', 'eventDesc'], `
+                        //     for(var i=0; i< context.chartInstance.length; i++) {
 
-                                if(context.chartInstance[i].uid === eventDesc.groupId) {
+                        //         if(context.chartInstance[i].uid === eventDesc.groupId) {
 
-                                        if (context.chartInstance[i].dataZoomInstance) {
-                                            context.chartInstance[i].dataZoomInstance.update({
-                                                startValue: parseFloat(eventDesc.start),
-                                                endValue: parseFloat(eventDesc.end)
-                                            });
-                                        }
-                                    context.chartInstance[i].updateRenderNodes(null, { percent: [parseFloat(eventDesc.start), parseFloat(eventDesc.end)] });
-                                    break;
-                                }
-                            }
-                        `);
-                        callback.push(newFunc);
+                        //                 if (context.chartInstance[i].dataZoomInstance) {
+                        //                     context.chartInstance[i].dataZoomInstance.update({
+                        //                         startValue: parseFloat(eventDesc.start),
+                        //                         endValue: parseFloat(eventDesc.end)
+                        //                     });
+                        //                 }
+                        //             context.chartInstance[i].updateRenderNodes(null, { percent: [parseFloat(eventDesc.start), parseFloat(eventDesc.end)] });
+                        //             break;
+                        //         }
+                        //     }
+                        // `);
+                        // callback.push(newFunc);
                     }
                 }
                 break;
